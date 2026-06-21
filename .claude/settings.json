@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /Users/ryanhermes/Desktop/BIZTECH/Wearable/.claude/ping.mp3"
+          }
+        ]
+      }
+    ]
+  }
+}
