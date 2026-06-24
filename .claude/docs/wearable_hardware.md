@@ -308,30 +308,56 @@ This is an experimental prototype, not a medical device.
 |---|---|---|---|
 | XIAO ESP32S3 | 21.5 mm | 17.5 mm | 3.5 mm |
 | MAX30102 (HiLetgo) | 14 mm | 14 mm | ~3–4 mm |
-| MLX90614 (GY-906) | ~17 mm | ~15 mm | ~3–4 mm |
 | OXWINOU 402030 LiPo | 30 mm | 20 mm | 4 mm |
+
+> MLX90614 excluded from current layout — Phase 1 module is XIAO + MAX30102 + battery only.
+
+### Committed layout
+
+```
+Side view (cross-section):
+┌─────────────────────────────────┐
+│   Battery  30 × 20 × 4 mm      │  ← top layer
+├──────────────────┬──────────────┤
+│  XIAO            │  MAX30102    │  ← bottom layer
+│  21.5 × 17.5mm   │  14 × 14mm  │
+└──────────────────┴──────────────┘
+        wrist side (skin-facing)
+```
+
+**Bottom layer:** XIAO and MAX30102 placed side by side.
+- Combined width: 17.5 + 14 = **31.5 mm**
+- Combined depth: XIAO drives this at **21.5 mm**
+
+**Top layer:** Battery lies flat across both bottom components.
+- Battery length (30 mm) ≈ combined bottom width (31.5 mm) — **1.5 mm delta**, negligible
+- Battery width (20 mm) ≈ XIAO depth (21.5 mm) — near-full coverage
+
+**Total module footprint:** ~31.5 mm × 21.5 mm × 11–12 mm thick
+
+| Layer | Thickness |
+|---|---|
+| Bottom (XIAO / MAX30102) | ~3.5–4 mm |
+| Top (battery) | 4 mm |
+| Enclosure walls (top + bottom) | ~2.4–4 mm (1.2–2 mm per wall) |
+| **Total estimated** | **~10–12 mm** |
+
+This lands in Apple Watch SE territory (~10.7 mm) at the thin end.
 
 ### Watch case sizing context
 
-Consumer smartwatch cases typically run 38–46 mm in diameter and 10–14 mm thick (lug-to-lug depth). Reference points:
+Consumer smartwatch cases typically run 38–46 mm in diameter and 10–14 mm thick. Reference points:
 
 | Reference device | Case size | Thickness |
 |---|---|---|
 | Apple Watch SE | 40 mm | ~10.7 mm |
 | Apple Watch Ultra | 49 mm | ~14.4 mm |
 | Garmin Forerunner 265 | 46 mm | ~13.4 mm |
-| Minimum practical wearable | ~35 mm | ~10 mm |
-
-### Fit assessment
-
-The XIAO at 21.5 × 17.5 mm is the largest single component. All three boards fit within a 40 mm circular case footprint — the XIAO's 21.5 mm diagonal is ~27 mm, well inside a 38 mm diameter.
-
-**Thickness is the harder constraint.** Stacking the XIAO + one sensor layer + battery would likely land at 12–18 mm without a custom PCB. A side-by-side layout (XIAO next to sensors, not stacked) reduces thickness but increases the X/Y footprint.
+| **This module (estimated)** | **~35 mm diagonal** | **~10–12 mm** |
 
 ### Enclosure design considerations
 
-- **Sensor placement:** MAX30102 must face the skin (wrist-side of enclosure) with an optical window. MLX90614 needs a clear line of sight to the target surface — also wrist-side, or a side port for ambient/object sensing.
-- **Battery:** OXWINOU 402030 LiPo (4 × 20 × 30 mm). At 4 mm thick it is actually the thinnest major component — the XIAO at 3.5 mm and sensor modules at ~3–4 mm are comparable. Battery will sit alongside (not under) the XIAO to keep the stack flat.
-- **Custom PCB path:** For a watch-sized enclosure, eventually replacing breadboard modules with a single custom PCB (bare ICs, no breakout boards) could reduce the combined sensor footprint to under 10 × 10 mm per sensor.
-- **3D printing:** Enclosure can be prototyped in FDM/resin. Plan for 1.2–2 mm wall thickness minimum.
+- **Sensor placement:** MAX30102 must face the skin (wrist-side of enclosure) with an optical window cut-out aligned to the sensor's LED/photodetector.
+- **Custom PCB path:** Replacing breakout boards with bare ICs on a single PCB would collapse the bottom layer to ~1.6 mm and allow a much thinner final enclosure.
+- **3D printing:** Plan for 1.2–2 mm wall thickness minimum. Bottom wall needs a precise optical window for MAX30102.
 - **Strap attachment:** Standard 20–22 mm lug width is common for DIY wearables and compatible with off-the-shelf bands.
