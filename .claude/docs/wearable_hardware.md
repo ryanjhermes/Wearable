@@ -24,6 +24,16 @@ This document tracks the main hardware components used in the wearable prototype
 | Battery support | LiPo battery charging supported, depending on board version |
 | Logic voltage | 3.3V |
 
+### Physical dimensions
+
+| Dimension | Value |
+|---|---|
+| Length | 21.5 mm |
+| Width | 17.5 mm |
+| Thickness | 3.5 mm |
+
+The PCB fits within a roughly 22 × 18 mm footprint — comfortably inside a 38 mm watch case diameter.
+
 ### Why we are using it
 
 The XIAO ESP32S3 is small enough for a wearable while still having Wi-Fi, BLE, enough memory for sensor processing, and support for both C++/Arduino and MicroPython.
@@ -87,6 +97,18 @@ MicroPython or CircuitPython
 | RD | Red LED ground terminal | Usually not connected |
 | IRD | IR LED ground terminal | Usually not connected |
 
+### Physical dimensions
+
+Two common breakout variants exist:
+
+| Variant | PCB size | Notes |
+|---|---|---|
+| HiLetgo (in use) | 14 mm × 14 mm | Compact; the one we have |
+| Generic large variant | ~25 mm × 20 mm | Common on Amazon/AliExpress, avoid for enclosure work |
+| IC bare die | 5.6 mm × 3.3 mm × 1.6 mm | Could be used on a custom PCB later |
+
+The HiLetgo board's 14 × 14 mm footprint is well-suited for a watch enclosure. Module height (components + PCB) is approximately 3–4 mm.
+
 ### Notes
 
 - Use **3.3V** with the XIAO unless the exact breakout documentation says otherwise.
@@ -127,6 +149,16 @@ Typical GY-906 module pins:
 | GND | Ground | GND |
 | SCL | I2C clock | XIAO SCL |
 | SDA | I2C data | XIAO SDA |
+
+### Physical dimensions
+
+| Dimension | Value |
+|---|---|
+| PCB length | ~17 mm |
+| PCB width | ~15 mm |
+| Module height | ~3–4 mm (estimated, varies by supplier) |
+
+The GY-906 footprint is similar in size to the HiLetgo MAX30102, making them roughly stackable or placeable side by side in an enclosure.
 
 ### Notes
 
@@ -226,3 +258,40 @@ Build a small wearable prototype that can collect basic body/environment signals
 - Optional vibration/display output later
 
 This is an experimental prototype, not a medical device.
+
+---
+
+## Enclosure Planning (Watch Form Factor)
+
+### Component footprint summary
+
+| Component | PCB length | PCB width | Module height |
+|---|---|---|---|
+| XIAO ESP32S3 | 21.5 mm | 17.5 mm | ~3.5 mm |
+| MAX30102 (HiLetgo) | 14 mm | 14 mm | ~3–4 mm |
+| MLX90614 (GY-906) | ~17 mm | ~15 mm | ~3–4 mm |
+
+### Watch case sizing context
+
+Consumer smartwatch cases typically run 38–46 mm in diameter and 10–14 mm thick (lug-to-lug depth). Reference points:
+
+| Reference device | Case size | Thickness |
+|---|---|---|
+| Apple Watch SE | 40 mm | ~10.7 mm |
+| Apple Watch Ultra | 49 mm | ~14.4 mm |
+| Garmin Forerunner 265 | 46 mm | ~13.4 mm |
+| Minimum practical wearable | ~35 mm | ~10 mm |
+
+### Fit assessment
+
+The XIAO at 21.5 × 17.5 mm is the largest single component. All three boards fit within a 40 mm circular case footprint — the XIAO's 21.5 mm diagonal is ~27 mm, well inside a 38 mm diameter.
+
+**Thickness is the harder constraint.** Stacking the XIAO + one sensor layer + battery would likely land at 12–18 mm without a custom PCB. A side-by-side layout (XIAO next to sensors, not stacked) reduces thickness but increases the X/Y footprint.
+
+### Enclosure design considerations
+
+- **Sensor placement:** MAX30102 must face the skin (wrist-side of enclosure) with an optical window. MLX90614 needs a clear line of sight to the target surface — also wrist-side, or a side port for ambient/object sensing.
+- **Battery:** Not yet selected. A LiPo cell will likely dominate enclosure volume. Common wearable cells: 100–300 mAh, roughly 20–40 × 15–30 × 3–5 mm.
+- **Custom PCB path:** For a watch-sized enclosure, eventually replacing breadboard modules with a single custom PCB (bare ICs, no breakout boards) could reduce the combined sensor footprint to under 10 × 10 mm per sensor.
+- **3D printing:** Enclosure can be prototyped in FDM/resin. Plan for 1.2–2 mm wall thickness minimum.
+- **Strap attachment:** Standard 20–22 mm lug width is common for DIY wearables and compatible with off-the-shelf bands.
