@@ -355,9 +355,47 @@ Consumer smartwatch cases typically run 38–46 mm in diameter and 10–14 mm th
 | Garmin Forerunner 265 | 46 mm | ~13.4 mm |
 | **This module (estimated)** | **~35 mm diagonal** | **~10–12 mm** |
 
+### Minimum interior cavity dimensions
+
+| Dimension | Calculation | Minimum |
+|---|---|---|
+| Width | XIAO (17.5) + wire gap (1.5) + MAX30102 (14) + 0.5 clearance each side | **34 mm** |
+| Depth | XIAO depth (21.5) + 0.5 clearance each side | **22.5 mm** |
+| Height | Bottom layer (4) + JST/wire gap (2) + battery (4) | **10 mm** |
+
+> These are interior cavity minimums. Add wall thickness on top to get exterior dimensions.
+
+### Pin header clearance
+
+The XIAO headers are confirmed soldered. Standard pin headers protrude ~3 mm below the PCB. Two options:
+
+- **Clip pins flush** — reduces bottom-layer height back to 3.5 mm, simplest option
+- **Recess the XIAO** — add a 3 mm floor recess under the XIAO footprint inside the enclosure, keeping the top surface level with the MAX30102
+
+If pins are left unclipped, the bottom interior height on the XIAO side becomes ~6.5 mm (3.5 mm PCB + 3 mm pins), and the total stack height increases to ~13 mm.
+
+### MAX30102 optical window
+
+The MAX30102 LED and photodetector must not be behind any enclosure material — PLA absorbs/scatters IR and will degrade or block readings. The bottom wall of the enclosure needs a cutout directly under the sensor.
+
+- Cutout should be at minimum 8 × 8 mm centered on the sensor die
+- Bottom wall in this area: 0 mm (open hole), not thinned PLA
+- The sensor sits wrist-side, so this opening faces the skin
+
+### 3D printing notes (Bambu A1 Mini, PLA)
+
+| Parameter | Value |
+|---|---|
+| Minimum wall thickness | 1.6 mm (4 perimeters at 0.4 mm nozzle) |
+| Lid/shell fit tolerance | 0.2–0.3 mm on mating interfaces |
+| Recommended layer height | 0.2 mm for enclosure walls |
+| Optical window | Open cutout — do not use thin PLA as a window |
+
+Exterior dimensions at 1.6 mm walls: **(34 + 3.2) × (22.5 + 3.2) × (10 + 3.2) = ~37 × 26 × 13 mm**
+
+This fits within a 40 mm watch case diameter.
+
 ### Enclosure design considerations
 
-- **Sensor placement:** MAX30102 must face the skin (wrist-side of enclosure) with an optical window cut-out aligned to the sensor's LED/photodetector.
-- **Custom PCB path:** Replacing breakout boards with bare ICs on a single PCB would collapse the bottom layer to ~1.6 mm and allow a much thinner final enclosure.
-- **3D printing:** Plan for 1.2–2 mm wall thickness minimum. Bottom wall needs a precise optical window for MAX30102.
 - **Strap attachment:** Standard 20–22 mm lug width is common for DIY wearables and compatible with off-the-shelf bands.
+- **Custom PCB path:** Replacing breakout boards with bare ICs on a single PCB would collapse the bottom layer to ~1.6 mm, allow pins to be eliminated, and bring the total stack under 10 mm.
