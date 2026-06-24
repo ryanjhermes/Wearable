@@ -169,6 +169,45 @@ The GY-906 footprint is similar in size to the HiLetgo MAX30102, making them rou
 
 ---
 
+## 4. Battery
+
+### OXWINOU 402030 LiPo — 3.7V 250mAh (2-pack)
+
+**Role:** Primary power source for the wearable. The XIAO ESP32S3 includes onboard LiPo charging, so this connects directly to the XIAO battery connector.
+
+### Key specs
+
+| Feature | Value |
+|---|---|
+| Model | 402030 |
+| Chemistry | Lithium Polymer (LiPo) |
+| Nominal voltage | 3.7V |
+| Capacity | 250 mAh |
+| Energy | 0.92 Wh |
+| Connector | JST-style 2-pin with red/black leads |
+| Comes in | 2-pack |
+
+### Physical dimensions
+
+The model number directly encodes the size: **4 mm thick × 20 mm wide × 30 mm long**.
+
+| Dimension | Value |
+|---|---|
+| Thickness | 4 mm |
+| Width | 20 mm |
+| Length | 30 mm |
+
+At 4 mm thick, this is well-suited for a slim watch profile. The 20 × 30 mm footprint is smaller than the XIAO and fits within a 38 mm case.
+
+### Notes
+
+- The XIAO ESP32S3 has a JST 1.25mm 2-pin battery connector — verify the OXWINOU connector pitch matches before plugging in. If needed, the connector can be swapped.
+- Never charge above 4.2V or discharge below 3.0V. The XIAO's onboard charger handles this if wired correctly.
+- The 2-pack means one spare — keep the second cell for a backup or a parallel wiring experiment.
+- LiPo cells are sensitive to puncture and over-compression. Enclosure design must not apply pressure directly to the cell body.
+
+---
+
 ## Shared Communication Bus
 
 Both the MAX30102 and MLX90614 use **I2C**, meaning they can share the same two data wires:
@@ -265,11 +304,12 @@ This is an experimental prototype, not a medical device.
 
 ### Component footprint summary
 
-| Component | PCB length | PCB width | Module height |
+| Component | Length | Width | Height/Thickness |
 |---|---|---|---|
-| XIAO ESP32S3 | 21.5 mm | 17.5 mm | ~3.5 mm |
+| XIAO ESP32S3 | 21.5 mm | 17.5 mm | 3.5 mm |
 | MAX30102 (HiLetgo) | 14 mm | 14 mm | ~3–4 mm |
 | MLX90614 (GY-906) | ~17 mm | ~15 mm | ~3–4 mm |
+| OXWINOU 402030 LiPo | 30 mm | 20 mm | 4 mm |
 
 ### Watch case sizing context
 
@@ -291,7 +331,7 @@ The XIAO at 21.5 × 17.5 mm is the largest single component. All three boards fi
 ### Enclosure design considerations
 
 - **Sensor placement:** MAX30102 must face the skin (wrist-side of enclosure) with an optical window. MLX90614 needs a clear line of sight to the target surface — also wrist-side, or a side port for ambient/object sensing.
-- **Battery:** Not yet selected. A LiPo cell will likely dominate enclosure volume. Common wearable cells: 100–300 mAh, roughly 20–40 × 15–30 × 3–5 mm.
+- **Battery:** OXWINOU 402030 LiPo (4 × 20 × 30 mm). At 4 mm thick it is actually the thinnest major component — the XIAO at 3.5 mm and sensor modules at ~3–4 mm are comparable. Battery will sit alongside (not under) the XIAO to keep the stack flat.
 - **Custom PCB path:** For a watch-sized enclosure, eventually replacing breadboard modules with a single custom PCB (bare ICs, no breakout boards) could reduce the combined sensor footprint to under 10 × 10 mm per sensor.
 - **3D printing:** Enclosure can be prototyped in FDM/resin. Plan for 1.2–2 mm wall thickness minimum.
 - **Strap attachment:** Standard 20–22 mm lug width is common for DIY wearables and compatible with off-the-shelf bands.
