@@ -13,8 +13,8 @@
         "hooks": [
           {
             "type": "command",
-            "statusMessage": "Updating project docs...",
-            "command": "[ -n \"$CLAUDE_DOCS_HOOK\" ] && exit 0; SID=$(jq -r '.session_id // empty'); T=\"$HOME/.claude/projects/-Users-ryanhermes-Desktop-BIZTECH-Wearable/${SID}.jsonl\"; [ -n \"$SID\" ] && [ -f \"$T\" ] && CLAUDE_DOCS_HOOK=1 claude -p \"Read the transcript at '$T' then update CLAUDE.md at '/Users/ryanhermes/Desktop/BIZTECH/Wearable/CLAUDE.md': add any confirmed hardware constraints, wiring notes, phase progress, or other non-obvious project facts from this session. Make minimal accurate additions only, do not remove existing content.\" --allowedTools Read,Edit /Users/ryanhermes/Desktop/BIZTECH/Wearable 2>/dev/null || true"
+            "async": true,
+            "command": "[ -n \"$CLAUDE_DOCS_HOOK\" ] && exit 0; SID=$(jq -r '.session_id // empty'); T=\"$HOME/.claude/projects/-Users-ryanhermes-Desktop-BIZTECH-Wearable/${SID}.jsonl\"; [ -n \"$SID\" ] && [ -f \"$T\" ] && CLAUDE_DOCS_HOOK=1 claude -p \"Read the transcript at '$T' and CLAUDE.md at '/Users/ryanhermes/Desktop/BIZTECH/Wearable/CLAUDE.md'. Only update CLAUDE.md if the session introduced facts a future Claude agent could not derive from the current file — e.g. a confirmed hardware constraint, a wiring decision, a phase change, or a physical limitation. If nothing meaningful changed, do nothing. Make minimal edits only.\" --allowedTools Read,Edit /Users/ryanhermes/Desktop/BIZTECH/Wearable 2>/dev/null || true"
           }
         ]
       }

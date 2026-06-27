@@ -178,4 +178,6 @@
  /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/spi_flash/include/esp_spi_flash_counters.h \
  /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/tools/sdk/esp32s3/include/esp_hw_support/include/soc/esp32/spiram.h \
  /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/cores/esp32/io_pin_remap.h \
- /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h
+ /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/cores/esp32/Arduino.h \
+ /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src/Wire.h \
+ /Users/ryanhermes/.platformio/packages/framework-arduinoespressif32/cores/esp32/esp32-hal.h
