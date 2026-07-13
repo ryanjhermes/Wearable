@@ -1,88 +1,49 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include "MAX30105.h"   // SparkFun lib class name is MAX30105; drives the MAX30102 too
-#include "heartRate.h"
 
-MAX30105 particleSensor;
+// MLX90614 read directly over Wire — no library (Adafruit lib won't build here, see CLAUDE.md)
+const uint8_t MLX_ADDR  = 0x5A;
+const uint8_t MLX_TA    = 0x06;   // ambient temperature register
+const uint8_t MLX_TOBJ1 = 0x07;   // object (surface) temperature register
 
-const byte RATE_SIZE = 4;   // BPM averaging window
-byte rates[RATE_SIZE];
-byte rateSpot = 0;
-long lastBeat = 0;          // ms timestamp of the last detected beat
-float beatsPerMinute = 0;
-int beatAvg = 0;
+// Reads one temperature register. Returns true on success, writing degrees C into out.
+bool readMLX(uint8_t reg, float &out) {
+  Wire.beginTransmission(MLX_ADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;   // repeated start, keep bus
+  if (Wire.requestFrom((int)MLX_ADDR, 3) != 3) return false;
 
-bool sensor_ok = false;     // non-blocking failure flag (see CLAUDE.md watchdog note)
+  uint8_t lsb = Wire.read();
+  uint8_t msb = Wire.read();
+  Wire.read();                                           // PEC checksum, ignored
 
-long lastPrint = 0;         // throttles serial output to once per second
-int beatsThisSecond = 0;    // beats counted in the current print window
+  uint16_t raw = ((uint16_t)msb << 8) | lsb;
+  if (raw & 0x8000) return false;                        // error flag set
+  out = raw * 0.02f - 273.15f;                           // raw is in 0.02K steps
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
   delay(2000);
-  Serial.println("MAX30102 heart rate test");
-
-  // 100kHz (I2C_SPEED_STANDARD) per project notes — 400kHz was unreliable over jumpers
-  if (particleSensor.begin(Wire, I2C_SPEED_STANDARD)) {
-    sensor_ok = true;
-    particleSensor.setup();                       // default config
-    particleSensor.setPulseAmplitudeRed(0x0A);    // dim red LED as a "powered" indicator
-    particleSensor.setPulseAmplitudeGreen(0);     // MAX30102 has no green LED
-    Serial.println("Ready. Rest a fingertip on the sensor with light, steady pressure.");
-  } else {
-    Serial.println("MAX30102 not found at 0x57 — check wiring.");
-  }
+  Wire.begin();
+  Wire.setClock(100000);   // 100kHz standard speed
+  Serial.println("MLX90614 temperature read");
 }
 
 void loop() {
-  if (!sensor_ok) {          // let loop() return so the watchdog stays fed
-    delay(1000);
-    return;
+  float object, ambient;
+  bool okObj = readMLX(MLX_TOBJ1, object);
+  bool okAmb = readMLX(MLX_TA, ambient);
+
+  if (okObj && okAmb) {
+    Serial.print("Ambient=");
+    Serial.print(ambient, 2);
+    Serial.print(" C,  Object=");
+    Serial.print(object, 2);
+    Serial.println(" C");
+  } else {
+    Serial.println("MLX read failed — check wiring / 0x5A");
   }
-
-  long irValue = particleSensor.getIR();
-  bool beat = checkForBeat(irValue);
-
-  if (beat) {
-    if (lastBeat != 0) {                    // skip the phantom first beat at startup
-      long delta = millis() - lastBeat;
-      beatsPerMinute = 60 / (delta / 1000.0);
-
-      if (beatsPerMinute < 255 && beatsPerMinute > 20) {
-        rates[rateSpot++] = (byte)beatsPerMinute;   // store this reading
-        rateSpot %= RATE_SIZE;
-
-        beatAvg = 0;
-        for (byte x = 0; x < RATE_SIZE; x++) beatAvg += rates[x];
-        beatAvg /= RATE_SIZE;
-      }
-    }
-    lastBeat = millis();
-    beatsThisSecond++;
-  }
-
-  if (irValue < 50000) {                    // finger lifted — reset stale state
-    beatsPerMinute = 0;
-    beatAvg = 0;
-  }
-
-  // Print one summary line per second so a long run stays readable
-  if (millis() - lastPrint >= 1000) {
-    lastPrint = millis();
-
-    if (irValue < 50000) {
-      Serial.println("No finger — rest fingertip lightly on the sensor");
-    } else {
-      Serial.print("Avg BPM=");
-      Serial.print(beatAvg);
-      Serial.print("  (last=");
-      Serial.print(beatsPerMinute, 0);
-      Serial.print(", beats this sec=");
-      Serial.print(beatsThisSecond);
-      Serial.print(", IR=");
-      Serial.print(irValue);
-      Serial.println(")");
-    }
-    beatsThisSecond = 0;
-  }
+  delay(1000);
 }
