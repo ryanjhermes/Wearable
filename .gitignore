@@ -6,3 +6,10 @@
 .DS_Store
 .env
 *.log
+__pycache__/
+*.pyc
+data/*.csv
+data/*.png
+data/*.log
+!data/.gitkeep
+.mplconfig/
