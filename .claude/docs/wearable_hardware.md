@@ -137,9 +137,56 @@ Typical GY-906 module pins:
 
 ---
 
+## 4. Motion Sensor (Accelerometer + Gyroscope)
+
+### HiLetgo BMI160 6-axis IMU Module (GY-BMI160)
+
+**Role:** 6-axis inertial measurement — 3-axis accelerometer + 3-axis gyroscope. For the wearable: motion/activity detection, orientation, and (via the chip's hardware pedometer) step counting.
+
+### Key specs
+
+| Feature | Value |
+|---|---|
+| Sensor | Bosch BMI160 |
+| Axes | 3-axis accel + 3-axis gyro (6 DOF) |
+| Interface | I2C / SPI (we use **I2C**) |
+| ADC | 16-bit per axis |
+| Accel range | ±2 / ±4 / ±8 / ±16 g |
+| Gyro range | ±125 / ±250 / ±500 / ±1000 / ±2000 °/s |
+| Module supply (VIN) | 3–5V per listing — **use 3.3V** to keep bus logic at 3.3V |
+| Logic voltage | 3.3V (chip VDDIO) |
+| Module size | 13 × 18 mm |
+| Upper temp rating | 85°C |
+| I2C address | `0x68` (SDO low) or `0x69` (SDO high) |
+| Sourcing | HiLetgo, ASIN B082KQ7L97, model BMI160, purchased 2026-06-30 |
+
+### Pins
+
+| Pin | Purpose | Connects to XIAO ESP32S3 |
+|---|---|---|
+| VIN | Power input | **3.3V** (never 5V — see note) |
+| GND | Ground | GND |
+| SCL | I2C clock | XIAO SCL |
+| SDA | I2C data | XIAO SDA |
+| SDO / SA0 | I2C address select | Leave unconnected (sets 0x68/0x69) |
+| CS | Interface select (I2C when high) | Usually not connected |
+| INT1 / INT2 | Interrupt outputs | Optional GPIO |
+
+### Notes
+
+- **Power at 3.3V, not 5V.** The listing rates VIN up to 5V, but this module shares an I2C bus with the MAX30102 and MLX90614 (3.3V parts). If VIN has no level shifting, 5V would put 5V logic on SDA/SCL and could damage the other two sensors. Keep the whole bus at 3.3V.
+- Address does not conflict with 0x57 (MAX30102) or 0x5A (MLX90614).
+- Firmware reads registers directly over `Wire` (no library) to avoid the Adafruit BusIO build failure documented for the MLX90614.
+- The BMI160 is **Bosch end-of-life** (successor: BMI270). Fine for a prototype; note it if the design heads toward anything durable.
+- Good early test: confirm it appears in an I2C scan at 0x68 or 0x69.
+
+**Reference images:** `.claude/docs/component_images/bmi160/` (empty — to be populated).
+
+---
+
 ## Shared Communication Bus
 
-Both the MAX30102 and MLX90614 use **I2C**, meaning they can share the same two data wires:
+The MAX30102, MLX90614, and BMI160 all use **I2C**, meaning they can share the same two data wires:
 
 ```text
 XIAO SDA → Sensor SDA
@@ -156,6 +203,7 @@ Each sensor has its own I2C address, so the XIAO can talk to them separately ove
 |---|---|
 | MAX30102 | 0x57 |
 | MLX90614 | 0x5A |
+| BMI160 | 0x68 or 0x69 |
 
 ---
 
@@ -171,6 +219,11 @@ XIAO ESP32S3 3.3V  → MLX90614 VCC/VIN
 XIAO ESP32S3 GND   → MLX90614 GND
 XIAO ESP32S3 SDA   → MLX90614 SDA
 XIAO ESP32S3 SCL   → MLX90614 SCL
+
+XIAO ESP32S3 3.3V  → BMI160 VIN   (3.3V only — not 5V)
+XIAO ESP32S3 GND   → BMI160 GND
+XIAO ESP32S3 SDA   → BMI160 SDA
+XIAO ESP32S3 SCL   → BMI160 SCL
 ```
 
 ---

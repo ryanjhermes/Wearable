@@ -20,10 +20,11 @@ unless the exact module documentation clearly says otherwise.
 
 ## Shared I2C Bus
 
-Both initial sensors use I2C:
+All sensors use I2C:
 
 - MAX30102 heart rate / PPG sensor
 - MLX90614 / GY-906 infrared temperature sensor
+- BMI160 6-axis accelerometer / gyroscope
 
 I2C uses two shared signal wires:
 
@@ -42,6 +43,7 @@ Multiple I2C devices can share the same SDA and SCL lines as long as they have d
 |---|---|
 | MAX30102 | `0x57` |
 | MLX90614 | `0x5A` |
+| BMI160 | `0x68` or `0x69` |
 
 ---
 
@@ -96,6 +98,26 @@ Notes:
 
 ---
 
+## BMI160 Wiring
+
+| BMI160 pin | Purpose | Connect to XIAO ESP32S3 |
+|---|---|---|
+| VIN | Power input | **3.3V only** (not 5V) |
+| GND | Ground | GND |
+| SCL | I2C clock | SCL |
+| SDA | I2C data | SDA |
+| SDO / SA0 | Address select | Leave unconnected (sets 0x68/0x69) |
+| CS | Interface select | Not connected (stays in I2C mode) |
+| INT1 / INT2 | Interrupt outputs | Optional GPIO |
+
+Notes:
+
+- **Power at 3.3V, not 5V** — 5V on VIN could put 5V logic on the shared bus and damage the MAX30102/MLX90614.
+- Address does not conflict with 0x57 or 0x5A.
+- Firmware auto-detects the chip at 0x68 or 0x69, so SDO can be left floating.
+
+---
+
 ## Initial Full Wiring Plan
 
 ```text
@@ -108,6 +130,11 @@ XIAO ESP32S3 3.3V  → MLX90614 VCC/VIN
 XIAO ESP32S3 GND   → MLX90614 GND
 XIAO ESP32S3 SDA   → MLX90614 SDA
 XIAO ESP32S3 SCL   → MLX90614 SCL
+
+XIAO ESP32S3 3.3V  → BMI160 VIN   (3.3V only — not 5V)
+XIAO ESP32S3 GND   → BMI160 GND
+XIAO ESP32S3 SDA   → BMI160 SDA
+XIAO ESP32S3 SCL   → BMI160 SCL
 ```
 
 ---
@@ -133,6 +160,7 @@ Expected successful result:
 ```text
 I2C device found at 0x57
 I2C device found at 0x5A
+I2C device found at 0x68   (or 0x69 — BMI160)
 ```
 
 If neither appears:
