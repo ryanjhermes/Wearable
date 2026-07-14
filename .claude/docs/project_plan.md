@@ -20,9 +20,7 @@ Initial hardware:
 
 Likely later hardware:
 
-- OLED display
 - Button
-- Vibration motor
 - Battery
 - 3D printed enclosure or wrist mount
 - BLE phone connection
