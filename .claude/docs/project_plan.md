@@ -183,7 +183,7 @@ Goal: move from desk prototype to actual wearable prototype.
 
 Tasks:
 
-- Test battery power.
+- Test battery power. **DONE (2026-07-19):** path (B) JST 1.25mm pigtail on the new XIAO; mirrored housing required board-side **black→`+` / red→`−`**; `battery_blink` unplug test passed. See `CLAUDE.md` Battery wiring.
 - Estimate runtime.
 - Reduce power usage.
 - Decide whether to keep OLED always off, occasionally on, or removed.
