@@ -4,164 +4,190 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Experimental wearable prototype using Seeed Studio XIAO ESP32S3. Collects body/environment signals via two I2C sensors. Not a medical device — readings are experimental.
+Experimental wearable prototype on a Seeed Studio XIAO ESP32S3. Collects body/environment signals
+via I2C sensors. Not a medical device — readings are experimental.
 
-**Current phase:** Phase 3 — sensor reads — is **COMPLETE (2026-07-13)**. Both sensors read live data: MAX30102 heart-rate is done and confirmed, and the MLX90614 temperature read is now done and confirmed (see Firmware Architecture). MLX90614 detection at 0x5A is also confirmed.
+**Status:** Phase 3 (sensor reads) is **COMPLETE**. MAX30102 heart rate and BMI160 motion both
+read live and are CONFIRMED simultaneously on the shared I2C bus. BLE HR streaming works
+untethered on battery. Battery power CONFIRMED working. Open work: enclosure (target form factor
+wristband/watch, module assembly in 3D-printed TPU — no custom PCB; min footprint ~57×24×11mm).
 
-**Target form factor:** Wristband/watch. Planned build approach: module assembly (XIAO + breakout boards in a 3D-printed TPU enclosure — no custom PCB). Sensors go skin-facing; XIAO on top. Minimum enclosure footprint: ~57 × 24 × 11mm (battery + XIAO + MAX30102 side-by-side).
-
-**Candidate application (2026-07-14, exploratory — not committed):** the user identified a target research replication — Kaczor et al., *"Detecting Ethanol Intoxication and Impairment Using Wearable Biosensors"* (HICSS 2026; the "Hawaii" is the conference venue, not the institution — authors are University at Buffalo + Brigham/Harvard). It uses a wrist-worn HR + skin-temperature + EDA + accelerometry combo with an **XGBoost** model (~0.80 impairment-detection accuracy). Three of its four channels map to existing parts (MAX30102 = HR, MLX90614 = temp, BMI160 = accel); the only missing channel is **EDA (electrodermal activity / GSR)**. This is a possible experiment goal, not a decision.
-
-**EDA / GSR sensor — hardware constraint if added (2026-07-14):** EDA is **analog, not I2C** — it does NOT join the shared SDA/SCL bus. Read it as a voltage on an ADC pin (e.g. D0/A0) via `analogRead()`, oversampled/averaged (the XIAO ADC is noisy). Candidate module: Seeed Grove GSR (~$8–12, finger-strap electrodes). EDA is strongest on fingers/palm — wrist EDA is weak/noisy — and is slow + motion-sensitive, so gate reads on BMI160 motion ≈ 0 (same as the temperature channel). No unit ordered yet.
-
-## Repo Layout & Background Docs
-
-- `src/<sensor>/main.cpp` — firmware, one folder per sensor: `src/max30102_heartrate/main.cpp` (heart rate) and `src/mlx90614_temperature/main.cpp` (temperature). Each folder is its own PlatformIO build environment. **This split superseded the earlier single `src/main.cpp` on 2026-07-12** (uncommitted at time of writing — the two committed sketches on `phase3-heart-rate` still live at `src/main.cpp`). See Firmware Architecture below.
-- `platformio.ini` — build/upload/monitor config; the source of truth for the serial port.
-- `.claude/docs/*.md` — background planning docs (not authoritative — this CLAUDE.md wins on any conflict):
-  - `project_plan.md` — 6-phase roadmap (currently Phase 2) and MVP definition.
-  - `wearable_hardware.md` — component spec sheets for the XIAO, MAX30102, and MLX90614.
-  - `wiring.md` — I2C wiring tables and scanner-troubleshooting steps.
-  - `development_setup.md` — PlatformIO/VS Code setup, boot/reset upload recovery, minimal blink sketch.
-- `.claude/docs/component_images/` — reference photos (paths cited inline in the Board/Hardware sections).
-
-Note: Wi-Fi is still out of scope for this prototype; **BLE HR streaming** is enabled via `max30102_hr_ble` (see Firmware Architecture).
+**Candidate application (exploratory, not committed):** replicate Kaczor et al., *"Detecting Ethanol
+Intoxication and Impairment Using Wearable Biosensors"* (HICSS 2026) — a wrist HR + skin-temp + EDA +
+accelerometry combo with an XGBoost model (~0.80 accuracy). Three of four channels map to existing
+parts (MAX30102=HR, MLX90614=temp, BMI160=accel); the missing channel is **EDA/GSR**, which is
+**analog, not I2C** — read as a voltage on an ADC pin (D0/A0) via oversampled `analogRead()`, gated on
+BMI160 motion ≈ 0. Candidate module: Seeed Grove GSR. No unit ordered.
 
 ## Toolchain
 
-PlatformIO is installed in a local venv. Always use it via:
+PlatformIO runs in a local venv. `source .venv/bin/activate` once per shell, then use `pio`.
+Do NOT `pip install` system-wide. Every `pio run`/`upload` MUST name an env with `-e`.
 
 ```bash
-source .venv/bin/activate                     # once per shell session
-pio run                                       # build ALL environments
-pio run -e max30102_heartrate                 # build just the heart-rate sketch
-pio run -e mlx90614_temperature               # build just the temperature sketch
-pio run -e i2c_scanner                         # build the shared-bus I2C scanner
-pio run -e combined_hr_temp                    # build the combined HR + temperature sketch
-pio run -e combined_hr_motion                  # build the combined HR + BMI160 motion sketch
-pio run -e bmi160_motion                       # build the BMI160 6-axis motion sketch
-pio run -e bmi160_motion_log                    # build the ~50Hz BMI160 motion CSV logger
-pio run -e battery_blink                        # build the onboard-LED blink battery-power test (no serial needed)
-pio run -e max30102_hr_log                      # build HR → LittleFS logger (dump over USB with "d")
-pio run -e max30102_hr_ble                      # build HR → BLE stream (untethered live data)
-pio run -e max30102_heartrate -t upload       # build + upload — MUST name the env now
-pio device monitor                            # serial monitor (115200 baud), exit with Ctrl+C
-pio device monitor -e bmi160_motion_log       # MUST name the env for its capture filter (see note)
-pio device monitor -e max30102_hr_log         # MUST name the env for flash_dump filter
-pio device list                               # check port if upload fails
+source .venv/bin/activate
+pio run                                # build ALL envs
+pio run -e <env> -t upload             # build + upload one env (close the monitor first)
+pio device monitor -e <env>            # serial monitor, 115200 baud, Ctrl+C to exit
+pio device list                        # find the port if upload fails (match 303A:1001)
 ```
 
-Do not use `python3 -m pip install` system-wide — use the venv.
+### Environments (`platformio.ini`, one folder per env under `src/<env>/main.cpp`)
+
+| Env | Purpose | Monitor filter → output |
+|---|---|---|
+| `max30102_heartrate` | Live HR read (SparkFun MAX3010x) | default |
+| `mlx90614_temperature` | Non-contact IR temp (direct `Wire`, no lib) | default |
+| `bmi160_motion` | BMI160 6-axis accel+gyro, 1 Hz | default |
+| `bmi160_motion_log` | BMI160 ~50 Hz CSV logger | `motion_csv` → `data/motion_*.csv` |
+| `i2c_scanner` | Shared-bus address scanner | default |
+| `combined_hr_temp` | MAX30102 HR + MLX90614 temp | `csv_capture` → `data/run_*.csv` |
+| `combined_hr_motion` | MAX30102 HR + BMI160 motion (watch live) | `csv_capture` (writes empty run_*.csv — see note) |
+| `max30102_hr_log` | HR → LittleFS CSV logger | `flash_dump` → `data/hr_flash_*.csv` |
+| `max30102_hr_ble` | HR → BLE stream (untethered) | — (use `scripts/ble_hr_stream.py`) |
+| `battery_blink` | Onboard-LED blink, no serial dep — battery test | — |
+
+**Filter gotcha:** the shared default filter `csv_capture` only matches HR/temp line format, so
+`combined_hr_motion` writes an *empty* `run_*.csv` (header only). For motion charting use
+`bmi160_motion_log`; `combined_hr_motion` is for watching both sensors live, not logging. Same
+trap for `max30102_hr_ble` if you open the monitor on it: it inherits the `csv_capture` default but
+prints the comma format `t_ms,avg_bpm,last_bpm,beats,ir,finger  ble=advertising`, which the filter
+ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — capture via
+`scripts/ble_hr_stream.py`; serial is watch-only.
+
+## Repo Layout
+
+- `src/<env>/main.cpp` — firmware, one folder per PlatformIO env (see table). Split from a single
+  `src/main.cpp` on 2026-07-12 via `build_src_filter`; shared settings live under `[env]`.
+- `platformio.ini` — build/upload/monitor config; **source of truth for the serial port**.
+- `monitor/filter_*.py` — serial-monitor capture filters: `filter_csv_capture.py`,
+  `filter_motion_csv.py`, `filter_flash_dump.py`. Wired per-env via `monitor_filters`.
+- `scripts/ble_hr_stream.py` — Mac-side BLE client (`pip install bleak`); streams `Wearable-HR`
+  to terminal and saves `data/ble_hr_*.csv`.
+- `notebooks/` — plotters: `plot_combined_run.ipynb`, `plot_motion_run.ipynb`, `plot_ble_hr.ipynb`.
+- `data/` — captured CSVs.
+- `.claude/docs/*.md` — background docs (not authoritative; this file wins on conflict):
+  `project_plan.md` (6-phase roadmap), `wearable_hardware.md` (component specs), `wiring.md`
+  (I2C wiring tables + scanner troubleshooting), `development_setup.md` (PlatformIO/upload recovery),
+  `hardware_debug_log.md` (historical bring-up narrative — battery, MLX, HR, bus sagas).
+- `.claude/docs/component_images/` — reference photos (`xiao_esp32s3/`, `max30102/`,
+  `mlx90614_gy906/`, `lipo_402030/`, `bmi160/`).
+
+Wi-Fi is out of scope; BLE (onboard antenna) is used for HR streaming.
 
 ## Board
 
-**Component images:** `.claude/docs/component_images/xiao_esp32s3/` — `top_view.png`, `angled_front.png`, `pinout_back.png`, `pinout_back_angled.png`, `size_reference.png`, `with_antenna_connected.png`, `with_antenna_disconnected.png`
+- **Board:** Seeed Studio XIAO ESP32S3 — PlatformIO ID `seeed_xiao_esp32s3`, Arduino framework.
+  ESP32-S3 (QFN56) rev v0.2, 8MB PSRAM, USB-Serial/JTAG (no drivers). Current board serial
+  `SER=E0:72:A1:FC:4F:80` (swapped in fresh 2026-07-19 — see debug log).
+- **Port:** `/dev/cu.usbmodem101` — the name flips on each replug. If upload/monitor fails with
+  "No such file or directory," run `pio device list`, match the `303A:1001` entry, and update
+  `upload_port`/`monitor_port` in `platformio.ini`.
+- **Pin positions** (USB-C at top): left side top→bottom `D0, D1, D2, D3, D4/SDA, D5/SCL, TX`;
+  right side `5V, GND, 3V3, D10, D9, D8, D7`. I2C: SDA=GPIO5, SCL=GPIO6 (`Wire.begin()` defaults).
 
-- **Board:** Seeed Studio XIAO ESP32S3
-- **PlatformIO ID:** `seeed_xiao_esp32s3`
-- **Framework:** Arduino (C++)
-- **Port:** `/dev/cu.usbmodem101` (as of 2026-07-19; was `/dev/cu.usbmodem1101` on 2026-07-14, `/dev/cu.usbmodem101` on 2026-07-13 — it flips on each replug) — the name changes after replug; `platformio.ini` is the source of truth. If upload/monitor fails with "No such file or directory," run `pio device list` and match the `303A:1001` entry, then update `upload_port` and `monitor_port` in `platformio.ini`
-- **Chip (confirmed by esptool):** ESP32-S3 (QFN56) revision v0.2, Embedded PSRAM 8MB (AP_3v3), Crystal 40MHz, USB mode: USB-Serial/JTAG
-- **Antenna:** Onboard antenna used for **BLE HR streaming** (`max30102_hr_ble` env). Wi-Fi still out of scope.
-- **Board swap (2026-07-19):** the user replaced the original XIAO with a **fresh, untouched XIAO ESP32S3** (old board serial `SER=E0:72:A1:FC:4F:CC`). No re-provisioning needed — same PlatformIO config, native USB-Serial/JTAG (no drivers), board-agnostic firmware. Bring-up is just: plug in → `pio device list` (new board has a different serial/MAC, so likely a different `/dev/cu.usbmodemXXX` — update `platformio.ini`) → flash. A brand-new board may not enter upload mode on the first try (unknown factory firmware) — if it hangs at `Connecting...`, force the bootloader (hold BOOT, tap RESET, release BOOT, re-upload). **Bring-up now CONFIRMED (2026-07-19): the new board enumerated on `/dev/cu.usbmodem101` (serial `SER=E0:72:A1:FC:4F:80`), accepted uploads, and ran firmware over USB (both `battery_blink` and `combined_hr_motion` flashed and printed to serial). No forced-bootloader step was needed. Battery path (B) is also CONFIRMED working on this board after a mirrored-JST re-solder — see Battery wiring. **MAX30102 direct-wired (no headers, 30 AWG) on the new board CONFIRMED (2026-07-19):** `max30102_heartrate` saw live IR ~109k–113k with a fingertip. BMI160 / MLX not yet on this board.**
-
-**Before uploading:** close the serial monitor first (Ctrl+C). If the monitor is open, `esptool` fails with `[Errno 35] Resource temporarily unavailable` (port busy).
-
-**If upload hangs at `Connecting...`:**
-1. Hold B (BOOT), start upload, tap R (RESET) when it says Connecting, release B.
-
-**After opening serial monitor:** tap RESET on the board to catch `setup()` output — the monitor connects after boot. Note: `pio run -t upload` auto-resets the board on completion, running `setup()` before the monitor can open. The firmware includes `delay(2000)` after `Serial.begin()` to create a window; open the monitor promptly after upload and press RESET once.
-
-**Serial monitor disconnect on reset:** USB-Serial/JTAG briefly drops (`[Errno 6] Device not configured`) when the board resets via RTS, then reconnects automatically. This is normal — wait for "Connected!" before tapping RESET to catch output.
+**Upload/monitor procedure:**
+- Close the serial monitor before uploading — else `esptool` fails with `[Errno 35] Resource
+  temporarily unavailable` (port busy).
+- If upload hangs at `Connecting...`: hold BOOT, start upload, tap RESET when it says Connecting,
+  release BOOT.
+- After opening the monitor, tap RESET to catch `setup()` output (monitor connects after boot;
+  firmware has `delay(2000)` after `Serial.begin()` for a catch window).
+- On reset, USB-Serial/JTAG briefly drops (`[Errno 6] Device not configured`) then reconnects —
+  normal; wait for "Connected!" before tapping RESET.
+- **USB+battery quirk:** enumeration fails when both are connected. Flash with the battery
+  unplugged; BLE runs fine on battery alone afterward.
 
 ## Hardware & I2C
 
-**Component images:**
-- MAX30102: `.claude/docs/component_images/max30102/` — `breakout_front_with_headers.png`, `breakout_front_back.png`, `schematic_redboard.png`
-- MLX90614: `.claude/docs/component_images/mlx90614_gy906/` — `breakout_front_with_headers.png`, `breakout_front_no_headers.png`, `breakout_back.png`
-- LiPo battery (402030, 3.7V 250mAh, 30×20×4mm): `.claude/docs/component_images/lipo_402030/` — `dimensions_diagram.png`, `product_photo.png`, `polarity_labels.png`
-- BMI160 (GY-BMI160): `.claude/docs/component_images/bmi160/` — folder created 2026-07-13, currently **empty** (no reference images yet)
+All sensors share one I2C bus (SDA=GPIO5, SCL=GPIO6). Power from **3.3V only — never 5V** (damages
+sensors). Wiring: `3V3→VIN, GND→GND, SDA→SDA, SCL→SCL`. Headers are soldered on both breakouts.
 
-**Battery wiring:** The XIAO has a `BAT` pad on the underside (visible in `pinout_back.png`) plus a charging IC. This unit has **bare pads only — no pre-installed JST connector** (confirmed from board images 2026-06-27). **The battery cell itself already ships with a 2-pin JST pigtail (red = +, black = −) — confirmed from `lipo_402030/product_photo.png` and `polarity_labels.png` (2026-07-12).** So the only work is the XIAO side: either (A) cut the JST off and solder red→`BAT`, black→`GND` directly (2 joints, battery no longer unplugs), or (B) solder a *matching* JST pigtail to the pads so the battery plugs/unplugs (removable; measure the pitch — JST 1.25mm vs PH 2.0mm — before ordering the mate). **Polarity is critical: red = BAT+, black = GND; reversing it can damage the board or vent the cell.** USB-C charges via the onboard IC regardless. Est. effort ~30–45 min. Runtime: 250mAh vs ~40–80mA active draw ≈ 3–6 h. **Decision (2026-07-19): the user chose path (B) — removable matching JST pigtail — and has the connector-pitch gauge to measure JST 1.25mm vs PH 2.0mm.** **Polarity gotcha for path B: a generic JST pigtail's housing polarity may NOT match the battery's — do not trust wire color across the connector; physically confirm red → BAT+ before first plug-in and be ready to re-pin the housing (small flathead lifts the plastic tab to pop and re-seat a pin) if reversed.** **Source of truth for polarity (user has NO multimeter, 2026-07-19): the XIAO underside is silkscreened `+`/`−` on the BAT pads (cross-check `pinout_back.png`); the battery's `polarity_labels.png` confirms battery-red = +. Trace battery-red *through* the mated connector to whichever board-side wire it lands on, and solder that wire to silkscreen `+` — do not trust the pigtail's own red/black paint. Solder with the battery UNPLUGGED from the pigtail (never solder a live cell).** **Installed on this board (2026-07-19, mirrored Letool/YP JST 1.25mm pigtail): black → `+`, red → `−`.** **First wiring attempted 2026-07-19 (user: "I think I have the battery connected wired right"). Discharge test RUN 2026-07-19 but INCONCLUSIVE: `battery_blink` was flashed, the onboard LED blinked while on USB, then went DARK the instant USB was unplugged. This does NOT prove bad solder — a flat cell and an open BAT joint produce the identical result, and USB was connected only ~10s (upload time), essentially zero charging, so a depleted-from-the-drawer LiPo is the MORE likely cause. Battery verification still PENDING. Next step to disambiguate: leave USB-C plugged 30–60 min and watch the charge LED near the USB port — lit while plugged = current flowing into the cell = solder joints good (cell was just flat); never lights = open BAT joint. Then re-run the `battery_blink` unplug test; LED staying lit on battery = confirmed working.** **Charge-LED test attempted 2026-07-20: with USB-C plugged in the user saw NO charge LED lit ("I don't see a light"). Not conclusive on its own (the XIAO's charge LED is small/dim — recheck in a dark room), but combined with the instant-death-on-unplug it shifts the leading hypothesis from "flat cell" toward "current not reaching the cell" — i.e. an open/cold BAT solder joint (holds mechanically but doesn't conduct) or a half-seated/mis-pinned JST. Battery connection still UNPROVEN. Plan: leave on USB 30–60 min, re-run `battery_blink` unplug test; if it still dies, reflow the BAT+/GND joints (flux + heat until solder flows INTO the pad, shiny) and reseat the connector.** **Board-heating observation 2026-07-20 (SAFETY — supersedes the open-joint lead): the user reported the board "heats up pretty quick" with the JST-pigtail battery + USB connected. Rapid heating is NOT an open-joint symptom — it is the signature of REVERSED POLARITY or a solder BRIDGE/short across the two BAT pads (current dumps as heat; also explains the no-charge-LED). With a LiPo this is a genuine fire/venting hazard. Guidance given: STOP, unplug USB AND unplug the battery from the pigtail, let cool, inspect the cell (warm/swollen/chemical smell = retire it), do not reconnect until polarity is verified.** **Root cause = mirrored JST housing — now VISUALLY CONFIRMED by the user (2026-07-20), not just predicted: inspecting the mated connectors, the battery's BLACK lands on the pigtail's RED wire and the battery's RED lands on the pigtail's BLACK. So the pigtail's own wire colors are the OPPOSITE of the battery's — matching red-to-red across the connector would reverse polarity. This is exactly the mirror warned about above. (The JST 1.25mm 2-pin connectors are keyed, so the battery only plugs in one way — but that one way is mirrored.) Even if pigtail-red was soldered to BAT+, the battery's red can land on BAT− through the connector. Re-solder fix WITHOUT a multimeter: (1) wick both pads clean, confirm NO solder bridge between them; (2) dry-fit — plug battery into the pigtail and trace which pigtail wire carries the battery's RED *through the connector*; (3) solder THAT wire to the silkscreen `+` pad (ignore the pigtail's own wire colors). Tin pad + wire separately, iron <3s per joint (parking lifts the pad), less solder on the close pads to avoid a bridge, shiny joints. On reconnect, feel for heat immediately — any warmth = polarity/short still wrong, unplug instantly.** **Caveat: if the board was reverse-powered for a while, the charge IC may already be damaged — so a clean, correct re-solder that still won't charge points to a dead board, not bad soldering.**
+| Sensor | Role | I2C address | State |
+|---|---|---|---|
+| MAX30102 | Heart rate / PPG | `0x57` | Healthy, HR CONFIRMED |
+| BMI160 (GY-BMI160) | 6-axis accel + gyro | `0x69` (this HiLetgo unit; SDO/SA0 pull selects 0x68/0x69; chip ID `0xD1` at reg `0x00`) | CONFIRMED live |
+| MLX90614 (GY-906) | Non-contact IR temp | `0x5A` | **Suspected dead** — last `Error -1` 2026-07-14; temp deprioritized |
 
-**Battery wiring FIXED and CONFIRMED (2026-07-19):** pads were cleaned and the board-side JST pigtail was re-soldered for the mirrored housing. **Installed polarity on this pigtail (do not "correct" by wire color):** board-side **black → silkscreen `+` (BAT+)**, board-side **red → silkscreen `−` (GND)**. That looks backwards on the wires alone, but after the connector it puts the battery's red on BAT+ and black on GND. `battery_blink` unplug test PASSED — onboard LED kept blinking after USB was removed → cell is powering the board. Board stayed cool; USB enumeration still works (`/dev/cu.usbmodem101`, new-board serial `SER=E0:72:A1:FC:4F:80`) so the charge IC survived the earlier reverse-polarity episode. Leaving USB + battery connected to charge is fine; charging is independent of the flashed sketch. To stop the blinking, flash any other env (e.g. `pio run -e combined_hr_motion -t upload`) — there is no off switch. Unplugging the battery while blinking is safe (just cuts power); avoid unplugging mid-upload.
+BMI160: leave SDO/SA0, INT, CS unconnected. MAX30102: leave INT/RD/IRD unconnected; its edge
+curvature only accepts the 4 middle pins (VIN/GND/SDA/SCL) — sufficient. BMI160 is Bosch EOL
+(successor BMI270) — fine for a prototype.
 
-**How to verify the battery — the serial monitor CANNOT do it.** The serial link rides the USB data line, so unplugging USB always kills the monitor (`Device not configured` → `Reconnecting…`) regardless of what the battery is doing — "board not found after USB unplug" is expected and tells you NOTHING about the battery. Use USB-independent signals instead (both now PASSED for this wiring):
-- **Charge LED test (proves the BAT+/BAT− joints conduct):** battery in its pigtail + USB-C plugged in → watch the XIAO's small charge LED near the USB connector. Lit = joints good, cell charging. Never lights = full cell OR an open BAT joint (reflow).
-- **Definitive discharge test (proves the battery powers the board):** flash `pio run -e battery_blink -t upload` — a dedicated onboard-LED blink sketch (`src/battery_blink/main.cpp`, ~2×/sec) that runs off whatever power the board has. LED keeps blinking after USB is unplugged → running on battery ✅. Goes dark instantly → cell not charged or open BAT joint (charge ~30 min, retry). This is the reliable no-serial confirmation. Reference video: [How to Connect a Lithium Battery to Seeed XIAO ESP32S3](https://manuals.plus/video/16b9f59474c955d6acc4d05f67b0dbbc2f30e4ef0fc076caf11a5bd86f193c77).
+**Off-breadboard build:** the current XIAO uses a direct-wired MAX30102 (30 AWG, no headers,
+CONFIRMED HR live). Decision: skip a perfboard bus and **daisy-chain** solder the shared
+3V3/GND/SDA/SCL point-to-point (I2C is a bus — device order doesn't matter). Reversible but each
+reheat stresses the pad. Keep the USB-C port reachable in the enclosure (charging + reflashing).
 
-**Off-breadboard I2C junction (planned, 2026-07-19):** the battery solders independently to BAT+/GND and does not touch the I2C bus. But removing the breadboard removes the shared fan-out (one 3V3/GND/SDA/SCL joining XIAO + MAX30102 + BMI160), so a new junction is needed since the XIAO has only one of each pin. Two options were weighed: a small perfboard bus (4 common rows = a permanent breadboard; keep the headers, serviceable) vs **point-to-point / daisy-chain** soldering (I2C is a bus — device order doesn't matter; remove headers, solder thin wires flat to the pads, smallest footprint but permanent). **Decision (2026-07-19): the user chose to SKIP the perfboard and go straight to daisy-chain.** Either way, **keep the USB-C port reachable in the enclosure** — needed for both charging and reflashing. **Daisy-chain is reversible**: to remove a soldered wire later, reheat the joint until the solder flows and pull the wire, then wick the pad clean with braid — but each reheat stresses the pad and a breakout pad can lift if the iron parks on it too long, so heat just until it flows. Not infinitely reworkable, but fine for iterating.
+**Battery:** LiPo 402030 (3.7V 250mAh) solders to the XIAO underside `BAT`/`GND` pads (independent
+of the I2C bus). Runtime ~3–6h. Path (B) chosen: removable matching JST 1.25mm pigtail.
+**Installed polarity — do NOT "correct" by wire color:** board-side **black → silkscreen `+`
+(BAT+)**, board-side **red → silkscreen `−` (GND)**. Looks backwards, but the pigtail housing is
+mirrored relative to the battery, so after the connector the battery's red lands on BAT+.
+CONFIRMED working; board stays cool; charge IC survived an earlier reverse-polarity episode.
+Full saga in `hardware_debug_log.md`.
 
-All sensors share one I2C bus (same SDA/SCL pins). All powered from 3.3V only — **never connect to 5V**, it will damage the sensors.
+**Verifying the battery — the serial monitor CANNOT do it** (serial rides USB; unplugging USB
+always kills the monitor regardless of battery state). Use USB-independent signals:
+- **Charge LED** (BAT joints conduct): battery + USB-C plugged → small charge LED near USB lights.
+- **Discharge** (cell powers the board): flash `battery_blink`, unplug USB → LED keeps blinking
+  = on battery ✅; goes dark = flat cell or open BAT joint.
+- **Rapid heating with battery + USB = reverse polarity or a short (SAFETY, LiPo fire risk).**
+  STOP, unplug both, let cool, inspect the cell. It is NOT an open-joint symptom.
 
-| Sensor | Role | I2C address |
-|---|---|---|
-| MAX30102 | Heart rate / PPG | `0x57` |
-| MLX90614 (GY-906) | Non-contact IR temperature | `0x5A` |
-| BMI160 (GY-BMI160) | 6-axis accel + gyro | `0x68` or `0x69` (SDO pull) |
-| BMI160 | 6-axis motion (accel + gyro) | `0x68` or `0x69` (SDO/SA0 pull selects; chip ID `0xD1` at reg `0x00`) |
-
-Wiring: `XIAO 3.3V → VIN`, `GND → GND`, `SDA → SDA`, `SCL → SCL` for all three (BMI160: leave SDO/SA0, INT, CS unconnected). Leave MAX30102 INT/RD/IRD unconnected unless needed. XIAO I2C pins: SDA = GPIO5, SCL = GPIO6 — `Wire.begin()` uses these by default, no need to specify in code.
-
-**XIAO physical pin positions (left side, USB-C end at top, counting down):** D0, D1, D2, D3, D4/SDA, D5/SCL, TX. **Right side (counting down):** 5V, GND, 3V3, D10, D9, D8, D7. For breadboard wiring: SDA is the 5th pin down on the left, SCL is the 6th pin down on the left.
-
-**MAX30102 physical note:** The breakout board's edge curvature only accepts 4 pins in the middle (VIN, GND, SDA, SCL) — this is sufficient. The INT/RD pins on the ends cannot be used without soldering directly to the board.
-
-**MAX30102 header state:** Header pins **soldered by user (2026-07-12)**, superseding the earlier bare-holes/breadboard-insertion state. Detection at 0x57 post-solder is **CONFIRMED (2026-07-12)** — scanner returned a stable `0x57` on every scan (12+ consecutive, no drops, no `Error -1`), wired via **breadboard with the soldered header pins** (not the planned direct-female-jumper path). Soldering was the fix, as predicted; the breadboard is reliable once the sensor has soldered headers. Prior (pre-solder) history: intermittent breadboard contact via header pins inserted through the PCB holes ACKed at 0x57 on 2026-06-24 but dropped on movement (see Error -1 below); earlier pressure-fit approaches failed entirely. Soldering was chosen as the only reliable fix.
-
-**I2C speed:** `I2C_SPEED_FAST` (400kHz) was too aggressive for breadboard wiring and contributed to read errors. Use `I2C_SPEED_STANDARD` (100kHz) in firmware for reliable operation over jumper wires.
-
-**ESP32 watchdog + bare `while(1)` halt:** On ESP32S3, `while(1);` with no yield starves the FreeRTOS task watchdog and causes the board to reset, producing the same disconnect/reconnect flood as a boot loop. **Correction (2026-07-01): `while(1) delay(1);` inside `setup()` still triggers this reset loop** — the loop task watchdog needs `loop()` itself to return periodically, not just a yielding delay inside `setup()`. The reliable pattern is to let `setup()` return normally on failure (set a `bool sensor_ok = false;` flag) and have `loop()` check the flag and early-return instead of blocking. Symptom: serial monitor shows repeated `Disconnected → Connected!` cycles immediately after upload.
-
-**MAX30102 `Error -1`:** The SparkFun library returns -1 when the device stops ACKing mid-read. This means physical I2C contact was lost (breadboard connection shifted), not a firmware bug. If it appears in a flood after valid reads, re-stabilize the breadboard connections or solder the header pins.
-
-**MAX30102 breadboard placement:** Sits on one half of the breadboard only — its pins are all on one side, so it cannot and does not need to straddle the center gap.
-
-**XIAO breadboard placement:** Must straddle the center gap with pins on both sides. Placing it on one side only would create internal shorts via the breadboard's horizontal row connections.
-
-**MLX90614 header state:** Headers soldered by user (2026-07-01), superseding the earlier bare-holes/insertion-trick state. Now plugs directly into the breadboard. Pinout is **VIN GND SCL SDA** left-to-right on the breakout edge. Board has onboard 4.7kΩ pull-ups — no external pull-ups needed. **Detection at 0x5A is now CONFIRMED (2026-07-13):** wired alone (MAX disconnected) with the soldered headers, the scanner returned a **stable `0x5A` on every scan**. This closes the long detection saga — the MLX now works. Earlier in the same session it had first shown the floating/noisy-bus signature (random shifting addresses each cycle: `0x8`, then nothing, then `0x3`/`0xD`, then `0x27–0x39`) caused by a power/ground contact fault via the new header pins; re-wiring to solid contact (MLX alone, direct jumpers) fixed it and it ACKed cleanly. Confirmed heuristic: random shifting addresses = floating bus / power-ground fault; a working MLX ACKs at a stable 0x5A every scan.
-
-**I2C scanner diagnostic heuristic:** changing/random addresses each scan = floating bus = power/ground fault (not contact, not firmware). A real device ACKs at the same address identically every scan.
-
-**XIAO header state:** Confirmed soldered from session photos (2026-06-21).
-
-**Setup approach:** Soldering is now the agreed path (user has iron, header pins, electrical wire, flux as of 2026-07-12) — breadboard jumper contact was too intermittent to proceed. Decision: solder **header pins** (not wires directly) to the MAX30102's 4 pins (VIN/GND/SDA/SCL), matching the MLX90614, to keep swap-in/swap-out flexibility during debugging; direct-wire soldering is deferred to the enclosure phase. Planned wiring is **female-female jumpers direct from XIAO to the soldered sensor headers, eliminating the breadboard**. Debug one sensor at a time. **This plan is fully executed and succeeded (2026-07-13):** both header sets are soldered (MLX90614 2026-07-01, MAX30102 2026-07-12) and the per-sensor scans confirmed 0x57 and 0x5A individually via direct female-jumper contact. What remains is verifying both together on the shared bus (see Firmware Architecture). **Update (2026-07-19): a second/new MAX30102 (no headers) is direct-wired with 30 AWG silicone to the replacement XIAO for a flatter wearable build — HR live on that path confirmed.**
-
-## Known Toolchain Issues
-
-- `toolchain-riscv32-esp` is a PlatformIO dependency that is not needed for ESP32S3 (Xtensa). A stub package lives at `~/.platformio/packages/toolchain-riscv32-esp/` to prevent download loops.
-- PlatformIO mirrors occasionally fail SSL (`[SSL] record layer failure`). It retries other mirrors automatically — wait it out.
-- The Arduino ESP32 framework (`framework-arduinoespressif32`) is ~3GB installed. Ensure at least 5GB free before first build.
-- **`adafruit/Adafruit MLX90614 Library` is unusable with this toolchain.** It pulls in `Adafruit BusIO`, which fails to compile (`fatal error: SPI.h: No such file or directory`) under PlatformIO's LDF chain mode — even though MLX90614 is I2C-only. Adding a bare `SPI` entry to `lib_deps` does not fix it. `robtillaart/MLX90614` is not a valid PlatformIO registry package name either (confirmed via failed install, 2026-07-01). Read the MLX90614 directly via `Wire` register calls instead of any library.
+**I2C diagnostic heuristics:**
+- Random/shifting addresses each scan = floating bus = power/ground fault (not contact, not firmware).
+- A real device ACKs at the same address every scan. Clean `(none)` = device unpowered or dead
+  (not a floating-bus fault).
+- MAX30102 `Error -1` (SparkFun lib) = device stopped ACKing mid-read = physical I2C contact lost,
+  not a firmware bug.
 
 ## Firmware Architecture
 
-Arduino framework: `setup()` runs once, `loop()` runs continuously. All sensor reads go in `loop()`. No RTOS, no threading currently.
+Arduino: `setup()` once, `loop()` continuously; all sensor reads in `loop()`. No RTOS/threading.
 
-**Layout reorg (2026-07-12, uncommitted):** the single `src/main.cpp` was split into one folder per sensor — `src/max30102_heartrate/main.cpp` (the working heart-rate sketch) and `src/mlx90614_temperature/main.cpp` (the temperature sketch, `git mv`-d from the old `src/main.cpp`) — each wired to its own PlatformIO environment via `build_src_filter` (shared settings now live under `[env]` in `platformio.ini`; `lib_deps` is shared there too). Build/flash with `-e max30102_heartrate` or `-e mlx90614_temperature`. **Both env builds are green.** The historical narrative below predates this move and still says `src/main.cpp` — read those references as "the sketch that is now in the per-sensor folder." The heart-rate code no longer needs recovering from git — it is back in the working tree at `src/max30102_heartrate/main.cpp`.
+**Non-blocking failure pattern (required on ESP32-S3):** never block in `setup()` on sensor failure.
+`while(1);` — and even `while(1) delay(1);` inside `setup()` — starves the FreeRTOS loop-task watchdog
+and triggers a reset loop (symptom: repeated `Disconnected → Connected!` after upload). Instead set a
+`bool sensor_ok = false;` flag, let `setup()` return, and have `loop()` early-return on the flag.
 
-**Current state (2026-07-12):** `src/main.cpp` is now a **MAX30102 heart-rate read sketch** (SparkFun `MAX30105`/`heartRate.h`, `checkForBeat`, 4-beat rolling `beatAvg`, non-blocking `sensor_ok` pattern), which **overwrote the I2C scanner** after 0x57 was confirmed. **Live-read status (2026-07-12): the PPG signal path is CONFIRMED working** — with a fingertip on the optical window, `IR` climbs from a ~500 baseline to a stable **~118,000** (the `< 50000` "No finger detected" threshold correctly clears), proving soldered sensor → I2C → live optical data end-to-end. **Beat detection / `Avg BPM` is still UNVERIFIED** — the first sketch had a phantom-first-beat bug (`lastBeat` initialized to 0 produced a frozen bogus `BPM=4.6`, `Avg BPM=0`); the fix now in `main.cpp` skips the first beat until `lastBeat != 0`, prints a `<-- beat!` marker per detected pulse, and zeroes the rate when the finger lifts. **The fix is CONFIRMED (2026-07-13): live reads now show `BPM=0.0` throughout, no more frozen `4.6`.** **Beat detection is now CONFIRMED working (2026-07-13):** `checkForBeat` *does* fire once a fingertip is held long enough — the earlier zero-beat captures were too short (finger settled for only ~1.5s) and/or too hard (a flat, high, steady DC level ~119,000–122,000 with no visible ripple = the "pressing too hard" signature — beat detection needs the small **AC pulse ripple** riding on the DC, e.g. IR wiggling 118500→118900→118400). The planned `checkForBeat`-replacement / custom-AC-detector rewrite was **considered but NOT applied** — the user got real beats first, so the SparkFun `checkForBeat` is kept as-is. Only the *output* was changed: `main.cpp` now **throttles serial to one summary line per second** (`Avg BPM=X  (last=Y, beats this sec=Z, IR=W)`, via `lastPrint`/`beatsThisSecond`), replacing the per-sample `<-- beat!` flood, so a 60s hold is ~60 readable lines. **Heart rate is now fully CONFIRMED end-to-end (2026-07-13):** a ~60s single-finger hold produced `Avg BPM` locking on after ~7s and then parked at a stable **74–82** (IR steady ~115–116k, `beats this sec` 1–2) for the better part of a minute — a plausible resting rate. Occasional wild `last=` values (12, 124, 25) are single-beat artifacts from micro-movement that the rolling average shrugs off; one brief dip to `Avg BPM=34` was a detection gap that self-recovered. Phase 3 heart-rate is done. **The heart-rate sketch is committed on branch `phase3-heart-rate` (commit "Add working MAX30102 heart-rate firmware").** After that commit, `main.cpp` was overwritten with a plain I2C scanner (1s interval) to confirm the MLX at 0x5A, and then — once confirmed — with the **MLX90614 temperature read** (see below). **So the current uncommitted `src/main.cpp` is the MLX90614 temperature-read sketch, not the heart-rate sketch nor the scanner; recover the heart-rate code from the committed branch when needed.**
+**I2C speed:** use `I2C_SPEED_STANDARD` (100kHz). `I2C_SPEED_FAST` (400kHz) is too aggressive over
+jumper/breadboard wiring and causes read errors.
 
-**MLX90614 temperature read — DONE and CONFIRMED (2026-07-13).** `main.cpp` now reads the MLX directly over `Wire` (no library): write the register address, `endTransmission(false)` for a repeated start, `requestFrom(addr, 3)` to read LSB/MSB/PEC, then `°C = raw × 0.02 − 273.15` (raw is 0.02K steps; high bit set = error, skip). Registers: `0x06` = ambient (Ta), `0x07` = object (Tobj1). Prints `Ambient=X C,  Object=Y C` once per second. **Live-verified end-to-end:** ambient sat at room temp (~25–30°C); object tracked what the sensor was aimed at — ~35°C at skin/forehead, ~20°C at a cold target, 100°C+ when pointed near the hot soldering iron. Object temp is surface/non-contact, drifts with distance/angle/airflow, and reads below core body temp — an experimental signal, not a fever thermometer. **Signal-viability verdict (2026-07-14 analysis):** on a wrist, non-contact IR is dominated by artifacts (sunlight ±8–15°C, walking/airflow 2–4°C, sweat 2–5°C inverted) while the real circadian body signal is only ~0.5–1.5°C — so it is usable only overnight/at rest as *deviation from a personal baseline*, not as an absolute or daytime thermometer. If temperature matters for the wearable, gate any read on BMI160 motion ≈ 0 and prefer a **contact** sensor (TMP117 or MAX30205) over the MLX90614. **Enclosure + drift-normalization plan (2026-07-14):** nesting the MLX in the electronics enclosure *helps* — it blocks the two worst artifacts (direct sunlight, airflow) but makes electronics self-heating the new dominant error (slow, predictable, measurable). Use the MLX's ambient register `0x06` (Ta = its own die/package temperature) as a drift reference: track `Tobj − Ta` or regress Ta out over time — in an enclosure both channels rise together, so the difference cancels most self-heating drift. **Log both `0x06` and `0x07` from the start** so the normalization data exists. With enclosure + Ta-normalization + motion-gating, only the fundamental limit (wrist skin ≠ core, non-contact geometry) remains.
+**Direct-`Wire` sensors (no library):** MLX90614 and BMI160 are read via raw `Wire` register calls —
+deliberately, to dodge a build trap (see Known Toolchain Issues), and the pattern is reusable.
+- MLX90614: write reg addr, `endTransmission(false)` (repeated start), `requestFrom(addr,3)` → LSB/MSB/PEC,
+  `°C = raw*0.02 − 273.15` (high bit set = error, skip). Regs `0x06`=ambient(Ta), `0x07`=object(Tobj1).
+  Non-contact IR is surface temp — drifts with distance/angle/airflow, reads below core body temp.
+  If revived: log **both** `0x06` and `0x07` from the start (Ta = die temp, used to regress out
+  enclosure self-heating drift), gate reads on BMI160 motion ≈ 0, prefer a contact sensor (TMP117/
+  MAX30205) for real temperature.
+- BMI160: auto-detect at `0x68`/`0x69` via chip ID `0xD1` (reg `0x00`), power accel+gyro to normal mode
+  with datasheet start-up delays, set ±2g / ±2000 dps, read the 12-byte block (gyro `0x0C`, accel `0x12`).
+  Update `ACC_LSB_PER_G` / `GYR_LSB_PER_DPS` if the ranges change.
+- **3D-trajectory caveat:** `plot_motion_run.ipynb`'s path is de-trended double-integrated accel — IMU
+  bias drifts quadratically, so it's trustworthy for gesture *shape* only, not absolute position. The
+  per-axis accel/gyro time series are the trustworthy signals.
 
-**On-chip HR flash logger — ADDED 2026-07-19.** Env `max30102_hr_log` (`src/max30102_hr_log/main.cpp`): same MAX30102 beat detection as the live HR sketch, but appends 1 Hz CSV lines `t_ms,avg_bpm,last_bpm,beats,ir,finger` to LittleFS (`/hr_log.csv`, capped at 512 KB). Runs on battery with USB unplugged. Over USB serial: `d` = dump (markers `---FLASH_DUMP_BEGIN/END---`), `e` = erase, `i` = size info. Monitor filter `flash_dump` writes dumps to `data/hr_flash_*.csv`. Flash with `pio run -e max30102_hr_log -t upload`, then `pio device monitor -e max30102_hr_log`.
+**HR beat detection:** SparkFun `checkForBeat` + 4-beat rolling `beatAvg`, kept as-is. It needs the small
+AC pulse ripple riding on the DC — a flat high steady DC (~119–122k, "pressing too hard") defeats it.
+Skip the first beat until `lastBeat != 0` (else a phantom frozen `BPM=4.6`). Serial throttled to one
+summary line/sec.
 
-**BLE HR live stream — ADDED 2026-07-19.** Env `max30102_hr_ble` (`src/max30102_hr_ble/main.cpp`): same 1 Hz HR sampling, broadcasts over BLE as device **`Wearable-HR`**. Standard Heart Rate service (0x180D) for generic apps + custom telemetry notify with CSV `t_ms,avg_bpm,last_bpm,beats,ir,finger`. **Untethered workflow:** flash once over USB (battery unplugged if USB+battery hides the port), unplug USB, power from battery, run `pip install bleak && python scripts/ble_hr_stream.py` on the Mac — streams live to terminal and saves `data/ble_hr_*.csv`. USB serial still works when plugged in for debug. **USB+battery quirk on this board:** enumeration fails when both are connected — flash with battery out; BLE works fine on battery alone.
+**BLE HR (`max30102_hr_ble`):** broadcasts as `Wearable-HR` — standard Heart Rate service (0x180D) for
+generic apps + a custom telemetry notify with CSV `t_ms,avg_bpm,last_bpm,beats,ir,finger`. Untethered
+workflow: flash over USB (battery out), unplug USB, power from battery, run `scripts/ble_hr_stream.py`.
 
-**BMI160 6-axis motion sketch — ADDED 2026-07-13, hardware-verified on the shared bus (enumerated at `0x69`).** `src/bmi160_motion/main.cpp` reads the BMI160 directly over `Wire` (no library — same reason as the MLX): auto-detects the chip at `0x68`/`0x69` via chip-ID `0xD1`, powers accel+gyro to normal mode with datasheet start-up delays, sets ±2g / ±2000 dps ranges, then reads the 12-byte data block (gyro 0x0C, accel 0x12) and prints one throttled line/sec (`A[g]=…  G[dps]=…`). Uses the non-blocking `sensor_ok` guard. Env: `pio run -e bmi160_motion`. **Live reads are now CONFIRMED on the shared bus (2026-07-13) — see the `combined_hr_motion` note below.** BMI160 is Bosch EOL (successor BMI270). Firmware defaults to whichever range constants (`ACC_LSB_PER_G`, `GYR_LSB_PER_DPS`) match the configured ranges — update both if the ranges change.
+**HR flash logger (`max30102_hr_log`):** 1 Hz CSV `t_ms,avg_bpm,last_bpm,beats,ir,finger` appended to
+LittleFS (`/hr_log.csv`, capped 512 KB). Serial commands: `d`=dump (`---FLASH_DUMP_BEGIN/END---`),
+`e`=erase, `i`=size.
 
-**BMI160 motion logger + spatial charting — ADDED 2026-07-13, uncommitted.** For motion capture/plotting (not just the 1 Hz combined test), `src/bmi160_motion_log/main.cpp` (env `bmi160_motion_log`) logs BMI160-only at **~50 Hz** as CSV lines `M,<t_ms>,<ax>,<ay>,<az>,<gx>,<gy>,<gz>` (MAX may share the bus but this sketch ignores it). Its env **overrides `monitor_filters`** to use `monitor/filter_motion_csv.py`, which writes `data/motion_*.csv` — deliberately separate from the HR `run_*.csv` files so the empty non-HR lines don't corrupt the HR notebook. `notebooks/plot_motion_run.ipynb` loads the latest `motion_*.csv` and plots per-axis accel/gyro time series plus an estimated 3D trajectory. **Caveat: the 3D path is de-trended double integration — trustworthy for gesture *shape* only; IMU bias drifts quadratically so absolute position/distance is not reliable.** Capture with `pio run -e bmi160_motion_log -t upload && pio device monitor`, move the sensor 10–20s, Ctrl+C to flush the CSV.
+## Known Toolchain Issues
 
-**Build is fixed and green (2026-07-01):** the `SPI.h` failure was caused by `adafruit/Adafruit MLX90614 Library`'s transitive dependency on `Adafruit BusIO`, which fails to compile under this toolchain (see Known Toolchain Issues). Removing that lib_dep entirely resolved it — `platformio.ini` currently declares only the SparkFun MAX3010x library. Do not re-add the Adafruit MLX90614 library.
-
-**Both sensors are now individually proven:** MAX30102 at a stable 0x57 (2026-07-12, heart-rate reads confirmed) and MLX90614 at a stable 0x5A (2026-07-13, temperature reads confirmed — see above). Both were tested **one sensor at a time** (the other disconnected). The long detection saga is closed; soldering the headers + solid direct-jumper contact was the fix, exactly as predicted. **Caveat (2026-07-13): the MLX90614 has since STOPPED responding and is now suspected dead — see the isolation test in the Firmware Architecture "Shared-bus progress" note below. The MAX30102 remains healthy (stable 0x57).**
-
-**BMI160 6-axis motion sensor added (2026-07-13, uncommitted):** the user is adding a BMI160 accelerometer/gyroscope as a **third** I2C sensor. New sketch `src/bmi160_motion/main.cpp` reads it directly over `Wire` (no library — same pattern as the MLX, dodges the Adafruit BusIO build trap): auto-detects the chip at `0x68`/`0x69` by verifying chip ID `0xD1` (reg `0x00`), powers up accel+gyro to normal mode with datasheet start-up delays, configures ±2g / ±2000 dps, and prints one throttled line/sec (`A[g]=…  G[dps]=…`) using the non-blocking `bmi_ok` guard. New `bmi160_motion` PlatformIO env added to `platformio.ini`. **Bring-up approach changed (2026-07-13): the user explicitly chose to wire the BMI160 onto the SHARED bus in tandem with the MAX30102 (NOT one-sensor-at-a-time), since the MLX is being set aside** — "lets do this with the bus to do it in tandem with the HR sensor. First, lets make sure the HR sensor still works." **This was executed and CONFIRMED live (2026-07-13):** the MAX30102 heart-rate read was re-flashed and reconfirmed, the BMI160 was wired onto the shared bus ("Accelerometer and MAX plugged in"), and a new combined sketch `src/combined_hr_motion/main.cpp` (env `combined_hr_motion`, distinct from `combined_hr_temp`) produced real simultaneous data — "we are getting data!" **This is the first confirmed simultaneous multi-sensor read on the shared I2C bus (MAX30102 + BMI160 coexisting live).** **Serial output now captured (2026-07-13, later same session):** the BMI160 enumerates at **`0x69`** (SDO/SA0 high on this HiLetgo unit) alongside the MAX at `0x57` — both printed at boot (`MAX30102 ready at 0x57.` / `BMI160 found at 0x69`). Rest values are healthy: lying flat, `A[g]≈0.0,-0.1,1.0` (gravity on Z) with X/Y near 0, gyro near 0, and both accel (±0.3–0.5g) and gyro (spikes to ~110 dps) respond live to tilt/rotation. So the exact address and rest values are no longer unrecorded. (The BMI160 hardware is a HiLetgo GY-BMI160, 13×18mm.) Note: **BMI160 is Bosch end-of-life** (BMI270 is the successor) — fine for a prototype.
-
-**Remaining Phase-3-and-beyond work:** the two original sensors have been proven **individually** on the confirmed hardware; whether they run **together on the shared I2C bus** (now potentially three devices with the BMI160) still needs verifying. Scaffolding for the merge already exists in the working tree (uncommitted as of 2026-07-13): `src/i2c_scanner/main.cpp` (shared-bus scanner, `i2c_scanner` env) and `src/combined_hr_temp/main.cpp` (combined MAX30102 HR + MLX90614 temperature read, `combined_hr_temp` env) — plus CSV-capture tooling (`monitor/filter_csv_capture.py`, wired via `monitor_filters = default, csv_capture` in `platformio.ini`, writing `data/run_*.csv`) and a `notebooks/plot_combined_run.ipynb` plotter. So a single sketch reading both **does** now exist; what's unconfirmed is a clean simultaneous read on the shared bus. **Shared-bus progress (2026-07-13):** the `i2c_scanner` env was run on the shared bus for the first time — with the MAX30102 wired it returns a **stable `0x57` every scan** (bus is healthy, MAX solid; not a power/ground fault), and the CSV-capture tooling is confirmed working (wrote `data/run_20260713_212542.csv`). But the **MLX90614 dropped off (0x5A absent) after breadboard components were shifted** — a mechanical contact fault (a jumper/row moved), not a bus-wide fault, since the MAX stayed stable; fix is re-seating the MLX's four jumpers on the shared 3V3/GND rails and checking its reversed `VIN GND SCL SDA` pin order. **Update (2026-07-13, later same session): re-seating and correct re-wiring did NOT restore it** — the scanner still returns a stable `0x57` only, with `0x5A` absent, so the MLX may now be damaged rather than just miscontacted. **Damage heuristic for the MLX: reverse polarity (VIN↔GND swapped) can fry it; a swapped SDA↔SCL is harmless (no comms, no damage), and it has been on 3V3 throughout. Second candidate cause added 2026-07-14: thermal overheating — during the working temperature demo the user held the MLX near the hot soldering iron (object temps hit 45–134°C) shortly before it died, so an over-temp kill is at least as likely as reverse polarity (matches the HEAD commit message "overheated? fried out?").** Dead-or-not test: wire the MLX alone, power on, and touch the metal can — a reverse-powered/shorted chip runs warm/hot within seconds; a healthy one stays cool. If it stays cool but never ACKs at 0x5A, reflow the header joints before concluding it's dead. **Isolation test run (2026-07-13, later same session): the MLX wired ALONE, direct female-jumpers to the XIAO (no breadboard), on the exact D4/D5 pins that had just returned a rock-solid `0x57` from the MAX, scanned clean `(none)` on every scan.** This localizes the fault to the MLX itself (XIAO I2C proven good on those same pins) and, because the scan was clean `(none)` — NOT random shifting addresses — it is not a floating-bus/ground fault on the data lines; the MLX is either unpowered (broken VIN/GND joint) or dead. Likely reverse-polarity damage. Final confirmation still pending: multimeter VIN→GND at the MLX pins should read ~3.3V (no 3.3V = power-joint fault, reseat/reflow; 3.3V present but still `(none)` = dead chip), or the touch test above. **Treat the MLX as suspected-dead until a fresh unit or a passing solo scan says otherwise. Decision (2026-07-13): the user has NO multimeter, so that confirmation test cannot be run; the user has chosen to move on WITHOUT the MLX for now (temperature is deprioritized, not abandoned — may retry once the sensors are direct-wired in the enclosure phase).** **Retry executed 2026-07-14: the user re-wired the MLX ALONE directly to the XIAO (no breadboard) and flashed `-e mlx90614_temperature` — it still returned `Error -1` (no ACK at 0x5A), a fresh direct-wire confirmation of the suspected-dead conclusion. Treat the MLX as dead pending a fresh unit.** BMI160 (0x68/0x69) was not yet wired during that scan — but it was wired later the same session and the MAX30102 + BMI160 shared-bus combined read was CONFIRMED live (see the `combined_hr_motion` note above), so simultaneous multi-sensor operation is no longer unconfirmed for those two. **Motion-logging tooling added (2026-07-13):** a dedicated ~50Hz BMI160-only CSV logger `src/bmi160_motion_log/main.cpp` (env `bmi160_motion_log`), a capture filter `monitor/filter_motion_csv.py` that matches the `M,…` line format and writes `data/motion_*.csv`, and a `notebooks/plot_motion_run.ipynb` plotter (per-axis accel/gyro time series + an estimated 3D trajectory). **Gotcha:** the `combined_hr_motion` env keeps the shared `csv_capture` filter, which only matches the HR/temp line format — so running it writes an **empty** `data/run_*.csv` (header only). For spatial/motion charting you must use `bmi160_motion_log` (its `monitor_filters` is overridden to `motion_csv`, writing `motion_*.csv`); `combined_hr_motion` is for watching both sensors live, not for logging motion. **3D-trajectory caveat:** position from a 6-axis IMU is double-integrated accel — bias errors compound quadratically and the path drifts within seconds; treat the trajectory as illustrative gesture shape, not real coordinates. The per-axis accel/gyro time series are the trustworthy signals. Next steps: commit the uncommitted working-tree sketches; proceed to later phases (enclosure/battery). Historical note: the pre-solder full-bus scanner (2026-07-01) found nothing at any address — a power/ground contact issue, not firmware; a third sensor (distance/VL53L0X-type) was considered and rejected for the same root cause.
-
-Sensor libraries must be declared in `platformio.ini` under `lib_deps` before they can be `#include`d:
-- MAX30102: `sparkfun/SparkFun MAX3010x Pulse and Proximity Sensor Library`
-- MLX90614: no library — read registers directly via `Wire` (see Known Toolchain Issues)
-
-PlatformIO fetches and links added libraries automatically on the next `pio run`.
+- **Do NOT use `adafruit/Adafruit MLX90614 Library`** — it pulls in Adafruit BusIO, which fails to
+  compile under this toolchain (`fatal error: SPI.h: No such file or directory`) even though MLX90614
+  is I2C-only. Read the MLX directly via `Wire` instead. `robtillaart/MLX90614` is not a valid registry
+  name either. Only `sparkfun/SparkFun MAX3010x` is declared in `lib_deps`.
+- `toolchain-riscv32-esp` is a PlatformIO dep not needed for ESP32-S3 (Xtensa); a stub at
+  `~/.platformio/packages/toolchain-riscv32-esp/` prevents download loops.
+- PlatformIO mirrors occasionally fail SSL (`[SSL] record layer failure`) — it retries other mirrors,
+  wait it out. `framework-arduinoespressif32` is ~3GB installed (need ≥5GB free before first build).
