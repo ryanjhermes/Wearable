@@ -187,7 +187,7 @@ Tasks:
 - Estimate runtime.
 - Reduce power usage.
 - Decide whether to keep OLED always off, occasionally on, or removed.
-- Design a simple enclosure.
+- Design a simple enclosure. **IN PROGRESS (2026-07-23):** first-pass two-part box (`.3mf` in `hardware/`, see `hardware/README.md`); corner strap lugs + USB-C slot. Not yet printed/fitted.
 - Design mounting for the MAX30102 so it maintains usable skin contact.
 - Design mounting for MLX90614 so it has a consistent view of the target surface.
 

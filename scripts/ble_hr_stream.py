@@ -30,17 +30,19 @@ HR_SERVICE = "0000180d-0000-1000-8000-00805f9b34fb"
 HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb"
 
 FIELDS = ["t_ms", "avg_bpm", "last_bpm", "beats", "ir", "finger"]
+# recv_ts = wall-clock time the Mac received the line. Accurate for LIVE data;
+# for a back-fill burst it's the drain time, not the original sample time (use
+# the device's t_ms for relative sample timing).
+CSV_FIELDS = ["recv_ts"] + FIELDS
 
 
 async def find_device(timeout: float = 15.0):
-    print(f"Scanning for {DEVICE_NAME} ({timeout:.0f}s)...")
     device = await BleakScanner.find_device_by_filter(
         lambda d, ad: d.name and DEVICE_NAME in d.name,
         timeout=timeout,
     )
-    if device is None:
-        raise RuntimeError(f"{DEVICE_NAME} not found — is firmware flashed and board powered?")
-    print(f"Found {device.name} [{device.address}]")
+    if device is not None:
+        print(f"Found {device.name} [{device.address}]")
     return device
 
 
@@ -57,26 +59,42 @@ def parse_hr(data: bytearray) -> int | None:
     return None
 
 
+async def stream_once(device, on_telem, on_hr) -> None:
+    """Connect and stream until the link drops. Returns on disconnect."""
+    async with BleakClient(device) as client:
+        print("Connected. Streaming (back-fill first, then 1 Hz)...")
+        await client.start_notify(TELEM_CHAR, on_telem)
+        await client.start_notify(HR_CHAR, on_hr)
+        # Poll the link; when we walk out of range this flips False and we return
+        # to the reconnect loop. The device keeps buffering to flash meanwhile.
+        while client.is_connected:
+            await asyncio.sleep(1)
+    print("Disconnected — will re-scan and reconnect; buffered data back-fills on return.")
+
+
 async def run(save_path: Path | None) -> None:
-    device = await find_device()
     writer = None
     fp = None
 
     if save_path:
         save_path.parent.mkdir(parents=True, exist_ok=True)
-        fp = save_path.open("w", newline="", encoding="utf-8")
+        # Append across reconnects so one file spans the whole session.
+        fp = save_path.open("a", newline="", encoding="utf-8")
         writer = csv.writer(fp)
-        writer.writerow(FIELDS)
-        fp.flush()
+        if fp.tell() == 0:
+            writer.writerow(CSV_FIELDS)
+            fp.flush()
         print(f"Saving → {save_path.resolve()}")
 
     def on_telem(_handle: int, data: bytearray) -> None:
+        now = datetime.now()
         line = data.decode("utf-8", errors="replace").strip()
-        print(line)
+        print(f"{now:%H:%M:%S}  {line}")
         if writer:
             parts = line.split(",")
-            if len(parts) == len(FIELDS):
-                writer.writerow(parts)
+            # Skip the CSV header that leads a store-and-forward back-fill burst.
+            if len(parts) == len(FIELDS) and parts[0].isdigit():
+                writer.writerow([now.isoformat(timespec="seconds")] + parts)
                 fp.flush()
 
     def on_hr(_handle: int, data: bytearray) -> None:
@@ -84,16 +102,20 @@ async def run(save_path: Path | None) -> None:
         if bpm is not None:
             print(f"[HR service] BPM={bpm}")
 
-    async with BleakClient(device) as client:
-        print("Connected. Waiting for 1 Hz notifications (Ctrl+C to stop)...")
-        await client.start_notify(TELEM_CHAR, on_telem)
-        await client.start_notify(HR_CHAR, on_hr)
+    # Reconnect loop: keep trying forever so temporary drops (out of range, board
+    # reset) resume on their own. Ctrl+C to stop.
+    print(f"Watching for {DEVICE_NAME} (Ctrl+C to stop)...")
+    while True:
+        device = await find_device()
+        if device is None:
+            print("Not in range — retrying...")
+            await asyncio.sleep(3)
+            continue
         try:
-            while True:
-                await asyncio.sleep(1)
-        finally:
-            await client.stop_notify(TELEM_CHAR)
-            await client.stop_notify(HR_CHAR)
+            await stream_once(device, on_telem, on_hr)
+        except Exception as exc:  # noqa: BLE001 — surface, then retry
+            print(f"Link error ({exc}) — retrying...")
+        await asyncio.sleep(2)
 
     if fp:
         fp.close()

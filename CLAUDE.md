@@ -9,8 +9,10 @@ via I2C sensors. Not a medical device — readings are experimental.
 
 **Status:** Phase 3 (sensor reads) is **COMPLETE**. MAX30102 heart rate and BMI160 motion both
 read live and are CONFIRMED simultaneously on the shared I2C bus. BLE HR streaming works
-untethered on battery. Battery power CONFIRMED working. Open work: enclosure (target form factor
-wristband/watch, module assembly in 3D-printed TPU — no custom PCB; min footprint ~57×24×11mm).
+untethered on battery. Battery power CONFIRMED working. Open work: enclosure — a first
+**simple two-part box** design exists as `.3mf` in `hardware/` (see `hardware/README.md`); target
+form factor is still wristband/watch in 3D-printed TPU — no custom PCB; min footprint ~57×24×11mm.
+Not yet confirmed printed/fitted against the assembled electronics.
 
 **Candidate application (exploratory, not committed):** replicate Kaczor et al., *"Detecting Ethanol
 Intoxication and Impairment Using Wearable Biosensors"* (HICSS 2026) — a wrist HR + skin-temp + EDA +
@@ -44,7 +46,8 @@ pio device list                        # find the port if upload fails (match 30
 | `combined_hr_temp` | MAX30102 HR + MLX90614 temp | `csv_capture` → `data/run_*.csv` |
 | `combined_hr_motion` | MAX30102 HR + BMI160 motion (watch live) | `csv_capture` (writes empty run_*.csv — see note) |
 | `max30102_hr_log` | HR → LittleFS CSV logger | `flash_dump` → `data/hr_flash_*.csv` |
-| `max30102_hr_ble` | HR → BLE stream (untethered) | — (use `scripts/ble_hr_stream.py`) |
+| `max30102_hr_ble` | HR → BLE stream, no flash buffer (data lost if unsubscribed) | — (use `scripts/ble_hr_stream.py`) |
+| `max30102_hr_ble_log` | HR → **store-and-forward**: logs to LittleFS AND streams BLE; back-fills the offline gap on reconnect | — (use `scripts/ble_hr_stream.py`; `d`/`e`/`i` over USB) |
 | `battery_blink` | Onboard-LED blink, no serial dep — battery test | — |
 
 **Filter gotcha:** the shared default filter `csv_capture` only matches HR/temp line format, so
@@ -63,9 +66,14 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
 - `monitor/filter_*.py` — serial-monitor capture filters: `filter_csv_capture.py`,
   `filter_motion_csv.py`, `filter_flash_dump.py`. Wired per-env via `monitor_filters`.
 - `scripts/ble_hr_stream.py` — Mac-side BLE client (`pip install bleak`); streams `Wearable-HR`
-  to terminal and saves `data/ble_hr_*.csv`.
+  to terminal and saves `data/ble_hr_*.csv`. Runs a **reconnect loop**: on a dropped link (out of
+  range, board reset) it re-scans/reconnects on its own and appends to one CSV across reconnects, so
+  the device's buffered data back-fills automatically on return (bleak's `BleakClient` has no built-in
+  reconnect — this is added client-side). Syntax-checked only, NOT yet hardware-verified.
 - `notebooks/` — plotters: `plot_combined_run.ipynb`, `plot_motion_run.ipynb`, `plot_ble_hr.ipynb`.
-- `data/` — captured CSVs.
+- `data/` — captured CSVs (gitignored).
+- `hardware/` — enclosure `.3mf` print files (`enclosure_top`, `enclosure_bottom`) + rendered
+  images; see `hardware/README.md`. First-pass simple two-part box.
 - `.claude/docs/*.md` — background docs (not authoritative; this file wins on conflict):
   `project_plan.md` (6-phase roadmap), `wearable_hardware.md` (component specs), `wiring.md`
   (I2C wiring tables + scanner troubleshooting), `development_setup.md` (PlatformIO/upload recovery),
@@ -73,7 +81,7 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
 - `.claude/docs/component_images/` — reference photos (`xiao_esp32s3/`, `max30102/`,
   `mlx90614_gy906/`, `lipo_402030/`, `bmi160/`).
 
-Wi-Fi is out of scope; BLE (onboard antenna) is used for HR streaming.
+Wi-Fi is out of scope; BLE (snap-on U.FL antenna — see Board note) is used for HR streaming.
 
 ## Board
 
@@ -85,6 +93,10 @@ Wi-Fi is out of scope; BLE (onboard antenna) is used for HR streaming.
   `upload_port`/`monitor_port` in `platformio.ini`.
 - **Pin positions** (USB-C at top): left side top→bottom `D0, D1, D2, D3, D4/SDA, D5/SCL, TX`;
   right side `5V, GND, 3V3, D10, D9, D8, D7`. I2C: SDA=GPIO5, SCL=GPIO6 (`Wire.begin()` defaults).
+- **BLE antenna is a detachable snap-on U.FL** (NOT onboard), shipped loose — see
+  `component_images/xiao_esp32s3/with_antenna_connected.png` vs `_disconnected.png`. If it pops off,
+  BLE range collapses to a few feet. **Abnormal short-range drops (e.g. dropping the link at ~5 ft)
+  → check the antenna is seated FIRST**, before raising TX power / tuning connection params.
 
 **Upload/monitor procedure:**
 - Close the serial monitor before uploading — else `esptool` fails with `[Errno 35] Resource
@@ -125,6 +137,12 @@ of the I2C bus). Runtime ~3–6h. Path (B) chosen: removable matching JST 1.25mm
 mirrored relative to the battery, so after the connector the battery's red lands on BAT+.
 CONFIRMED working; board stays cool; charge IC survived an earlier reverse-polarity episode.
 Full saga in `hardware_debug_log.md`.
+**Suspected intermittent battery-power fault (2026-07-23, UNRESOLVED):** a BLE capture died after
+only ~20 min, and afterward the MAX30102 red LED was dark on battery (out of the enclosure). On USB
+the board is fully healthy — boot log shows `Sensor ready`, live IR ~27k, buffered flash intact — so
+the sensor/firmware are fine and the fault is **battery-side** (flat cell or intermittent BAT/JST
+joint), NOT the ~40–90 s BLE drops. This means "CONFIRMED working" above no longer holds unconditionally.
+Diagnose with `battery_blink` + USB unplug, or A/B swap to the second (charged) cell; result not yet captured.
 
 **Verifying the battery — the serial monitor CANNOT do it** (serial rides USB; unplugging USB
 always kills the monitor regardless of battery state). Use USB-independent signals:
@@ -133,6 +151,13 @@ always kills the monitor regardless of battery state). Use USB-independent signa
   = on battery ✅; goes dark = flat cell or open BAT joint.
 - **Rapid heating with battery + USB = reverse polarity or a short (SAFETY, LiPo fire risk).**
   STOP, unplug both, let cool, inspect the cell. It is NOT an open-joint symptom.
+- **Steady, noticeable (not burning) module warmth on battery is expected under the always-on
+  firmware** (`max30102_hr_ble_log`: 240 MHz + BLE radio never sleeps → the same root cause as the
+  ~3–4 h runtime). Distinguish from the fault above: benign = only the XIAO module is warm, the cell
+  stays cool, warmth stabilizes, and USB-only is equally warm; fault = the LiPo **cell** itself is
+  warm/swelling or the temperature keeps climbing → unplug. (Observed 2026-07-23; cell-vs-module
+  check not yet done. Fix if wasteful: light-sleep between 1 Hz samples, lower BLE TX power,
+  `setCpuFrequencyMhz` 80–160 — all cut heat and extend runtime together.)
 
 **I2C diagnostic heuristics:**
 - Random/shifting addresses each scan = floating bus = power/ground fault (not contact, not firmware).
@@ -180,6 +205,50 @@ workflow: flash over USB (battery out), unplug USB, power from battery, run `scr
 **HR flash logger (`max30102_hr_log`):** 1 Hz CSV `t_ms,avg_bpm,last_bpm,beats,ir,finger` appended to
 LittleFS (`/hr_log.csv`, capped 512 KB). Serial commands: `d`=dump (`---FLASH_DUMP_BEGIN/END---`),
 `e`=erase, `i`=size.
+
+**HR store-and-forward (`max30102_hr_ble_log`):** merges the flash logger and BLE stream. One sample per
+`SAMPLE_INTERVAL_MS` (now **3 s**, was 1 Hz — beat detection still samples IR every `loop()`; only the
+append+notify+serial line is throttled) is appended to `/hr_log.csv`; **all telemetry flows through a
+persisted byte cursor** (`/hr_sent.off`)
+— when a BLE client connects it back-fills from the cursor to EOF, then streams live, so an offline gap
+(Mac asleep, out of range) is buffered and delivered on reconnect. No app-layer acks: the cursor advances
+as each line is notified, so a clean reconnect resumes exactly, and only the single in-flight line can drop
+on an abrupt disconnect. Once fully drained past 64 KB the flash is **compacted** (rewritten to header only)
+to reclaim space, so continuous wear won't hit the 512 KB cap unless offline for hours. Same `d`/`e`/`i`
+USB commands. The Mac client (`ble_hr_stream.py`) skips the header line that leads a back-fill burst.
+**Buffer is sized to the hardware:** at ~30 B/line and one line / 3 s the 512 KB cap holds ~14 h offline
+(~4.5–5 h at the old 1 Hz), but the 250 mAh cell (no sleep: ~50–70 mA draw → ~3–4 h) dies first —
+**battery is the binding constraint, not flash.** No point enlarging the buffer until the battery is extended (light-sleep during no-finger, or a
+bigger cell); a binary log format (~8 B/sample) would only matter after that.
+**Status: the 3 s-cadence build is FLASHED and boots on-device (2026-07-22, 968 KB / 29% flash)** and is
+the board's active firmware (replaces `max30102_hr_ble`). The `beats` column now counts beats over each
+3 s window (was 1 s) — the CSV header is generic so nothing downstream breaks, just reinterpret that field;
+`t_ms` still resets to 0 on each reboot, so erase (`e`) old 1 Hz-spaced data before a clean capture.
+Store-and-forward reconnect/resume ran LIVE on hardware (2026-07-22 walk-away test): the client logged
+repeated `Disconnected — will re-scan and reconnect` → `Connected. Streaming (back-fill first…)` with
+`t_ms` continuing near-continuously across each drop (e.g. …544751 → reconnect → 550803), so the
+firmware buffers across a drop and the client resumes without a gap. NOT yet byte-verified line-for-line
+against buffer contents — resume was continuous but the burst wasn't counted against what was logged
+offline. A fast ~10 lines/sec burst on connect with `t_ms` stepping ~3000/line is the expected back-fill
+draining, not a bug.
+**BLE link is unstable even in-range (2026-07-22):** drops recur every ~40–90 s at 5+ ft. Leading
+suspicion is the **detachable U.FL antenna not fully seated** — check that before trusting any TX-power
+tuning. (Uncommitted `src/max30102_hr_ble_log/` edits add a CONFIG block, +9 dBm TX power `P9`, and a 6 s
+supervision timeout `CONN_TIMEOUT=600` to fight the drops, plus `RED_PULSE_AMPLITUDE` 0x0A→0x1F for
+stronger finger signal, plus a **30 s time-window BPM average** (`BPM_WINDOW_MS=30000`) that replaces the
+4-beat ring: `avg_bpm` now averages every beat in the last 30 s (`60000×(beats−1)÷span`), needs ≥2 beats
+(reads 0 until then), takes ~30 s to reflect a real rate change, and clears on finger-lift — steadier for
+resting HR, not for fast changes. These are now **FLASHED and boot-confirmed on-device (2026-07-23)** —
+they are the board's active firmware, replacing the plain 3 s build. Boot capture over USB showed the
+MAX30102 initializing fine (`Sensor ready`, live IR ~27k) and buffered data intact in flash
+(`log=65390 sent=61538 buffered=3874`).)
+**Halved-BPM diagnosis (2026-07-22):** the 3 s cadence does NOT affect the BPM math (beat intervals are
+still timed every `loop()`). Low/halved readings were **missed beats** from noisy finger contact (IR
+swinging wildly line-to-line + `finger` flipping 1/0) and reconnect stalls — not a cadence bug. Clean,
+still, light fingertip contact is the fix.
+**Client wall-clock timestamps (2026-07-22):** `ble_hr_stream.py` now prepends a `recv_ts` receive-time
+column/print to each line (Mac-side, no flash needed). `recv_ts` is accurate for live data but is *drain*
+time, not sample time, during a back-fill burst — the device's `t_ms` remains the true relative clock.
 
 ## Known Toolchain Issues
 
