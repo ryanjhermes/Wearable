@@ -48,6 +48,7 @@ pio device list                        # find the port if upload fails (match 30
 | `max30102_hr_log` | HR → LittleFS CSV logger | `flash_dump` → `data/hr_flash_*.csv` |
 | `max30102_hr_ble` | HR → BLE stream, no flash buffer (data lost if unsubscribed) | — (use `scripts/ble_hr_stream.py`) |
 | `max30102_hr_ble_log` | HR → **store-and-forward**: logs to LittleFS AND streams BLE; back-fills the offline gap on reconnect | — (use `scripts/ble_hr_stream.py`; `d`/`e`/`i` over USB) |
+| `max30102_raw_ir` | Raw IR waveform → BLE (~100 Hz, batched) for HR-algorithm dev | — (use `scripts/raw_ir_capture.py`) |
 | `battery_blink` | Onboard-LED blink, no serial dep — battery test | — |
 
 **Filter gotcha:** the shared default filter `csv_capture` only matches HR/temp line format, so
@@ -70,6 +71,13 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
   range, board reset) it re-scans/reconnects on its own and appends to one CSV across reconnects, so
   the device's buffered data back-fills automatically on return (bleak's `BleakClient` has no built-in
   reconnect — this is added client-side). Syntax-checked only, NOT yet hardware-verified.
+- `scripts/raw_ir_capture.py` — Mac client for the `max30102_raw_ir` firmware; subscribes to
+  `Wearable-IR`, expands each batched notify into per-sample rows, saves `data/raw_ir_*.csv`
+  (`recv_ts,t_ms,ir`). Auto-reconnects. **Purpose:** record the true wrist PPG waveform to design a
+  band-pass + autocorrelation/FFT HR estimator (SparkFun `checkForBeat` is unreliable on wrist PPG —
+  see HR beat detection note).
+- `scripts/plot_raw_ir.py` — plots a raw-IR capture (raw waveform, AC pulse, HR-band FFT) with numpy+
+  matplotlib; prints the FFT peak BPM and saves a `.png` next to the CSV.
 - `notebooks/` — plotters: `plot_combined_run.ipynb`, `plot_motion_run.ipynb`, `plot_ble_hr.ipynb`.
 - `data/` — captured CSVs (gitignored).
 - `hardware/` — enclosure `.3mf` print files (`enclosure_top`, `enclosure_bottom`) + rendered
@@ -88,15 +96,37 @@ Wi-Fi is out of scope; BLE (snap-on U.FL antenna — see Board note) is used for
 - **Board:** Seeed Studio XIAO ESP32S3 — PlatformIO ID `seeed_xiao_esp32s3`, Arduino framework.
   ESP32-S3 (QFN56) rev v0.2, 8MB PSRAM, USB-Serial/JTAG (no drivers). Current board serial
   `SER=E0:72:A1:FC:4F:80` (swapped in fresh 2026-07-19 — see debug log).
+- **Possible board switch → XIAO ESP32-C3 (under consideration, 2026-07-24):** the current S3 is
+  likely damaged (board thermal fault — see debug log), so a replacement is coming. Considering the
+  **XIAO ESP32-C3** instead of another S3: single-core RISC-V @160 MHz, 4 MB flash, no PSRAM — all
+  fine for this workload — and **lower power/heat + longer battery runtime**, which matters for a
+  wearable. Nearly drop-in: same wiring pads, `Wire.begin()` defaults, BLE/LittleFS/SparkFun libs all
+  port; only the PlatformIO board id changes to `seeed_xiao_esp32c3` + recompile. **Does NOT fix the
+  antenna** — the C3 uses the same external U.FL antenna as the S3. A true zero-change drop-in is
+  another S3. No C3 ordered yet; no `seeed_xiao_esp32c3` env added yet.
+  **Replacement-board option (discussed 2026-07-24, not committed):** the **XIAO ESP32-C3** is a
+  near drop-in for the retire-this-board plan — single-core RISC-V 160 MHz, 4MB flash, no PSRAM, but
+  runs **cooler / longer on battery** and everything this project uses (I2C via `Wire` defaults, ESP32
+  BLE stack, LittleFS, SparkFun MAX3010x) ports with only a one-line PlatformIO board-id change
+  (`seeed_xiao_esp32c3`) + recompile. It does **NOT** fix the antenna — the C3 uses the same external
+  U.FL. Only a board with an onboard PCB-trace antenna (e.g. a C3 "SuperMini") eliminates the U.FL.
 - **Port:** `/dev/cu.usbmodem101` — the name flips on each replug. If upload/monitor fails with
   "No such file or directory," run `pio device list`, match the `303A:1001` entry, and update
   `upload_port`/`monitor_port` in `platformio.ini`.
 - **Pin positions** (USB-C at top): left side top→bottom `D0, D1, D2, D3, D4/SDA, D5/SCL, TX`;
   right side `5V, GND, 3V3, D10, D9, D8, D7`. I2C: SDA=GPIO5, SCL=GPIO6 (`Wire.begin()` defaults).
-- **BLE antenna is a detachable snap-on U.FL** (NOT onboard), shipped loose — see
-  `component_images/xiao_esp32s3/with_antenna_connected.png` vs `_disconnected.png`. If it pops off,
-  BLE range collapses to a few feet. **Abnormal short-range drops (e.g. dropping the link at ~5 ft)
-  → check the antenna is seated FIRST**, before raising TX power / tuning connection params.
+- **BLE antenna is a detachable external U.FL antenna (NOT onboard) — the XIAO ESP32S3 has no usable
+  onboard antenna, so this piece IS the antenna.** It's the flat black flex-PCB in
+  `component_images/xiao_esp32s3/with_antenna_connected.png` (connects via a thin coax + U.FL snap).
+  **KNOWN ROOT CAUSE (confirmed 2026-07-22): the antenna has NEVER been installed** (user finds it too
+  large for a wristband) → BLE runs on just the bare U.FL stub, giving only ~1–2 ft of unstable range.
+  This is the cause of ALL the chronic drops this session (every ~40–90 s, drops at 5 ft, and
+  "died/never reconnected" = the device drifted out of the tiny bubble and the Mac can no longer hear
+  its advertising; the device is fine and still advertising). **TX-power and supervision-timeout
+  tuning only treat symptoms — they cannot replace the missing radiator** (the +9 dBm P9 boost tried
+  earlier was wasted current/heat for zero range gain; reverted to P3 2026-07-24). For any reliable BLE work,
+  plug the antenna in (it's flexible — tape/fold it). Form-factor conflict is open: options are a
+  smaller U.FL chip antenna, routing the flat antenna along the band, or a board with a PCB antenna.
 
 **Upload/monitor procedure:**
 - Close the serial monitor before uploading — else `esptool` fails with `[Errno 35] Resource
@@ -137,12 +167,15 @@ of the I2C bus). Runtime ~3–6h. Path (B) chosen: removable matching JST 1.25mm
 mirrored relative to the battery, so after the connector the battery's red lands on BAT+.
 CONFIRMED working; board stays cool; charge IC survived an earlier reverse-polarity episode.
 Full saga in `hardware_debug_log.md`.
-**Suspected intermittent battery-power fault (2026-07-23, UNRESOLVED):** a BLE capture died after
-only ~20 min, and afterward the MAX30102 red LED was dark on battery (out of the enclosure). On USB
-the board is fully healthy — boot log shows `Sensor ready`, live IR ~27k, buffered flash intact — so
-the sensor/firmware are fine and the fault is **battery-side** (flat cell or intermittent BAT/JST
-joint), NOT the ~40–90 s BLE drops. This means "CONFIRMED working" above no longer holds unconditionally.
-Diagnose with `battery_blink` + USB unplug, or A/B swap to the second (charged) cell; result not yet captured.
+**Suspected battery-power fault (2026-07-23) — battery cleared, cause reassigned (2026-07-24):** a BLE
+capture died after only ~20 min, and afterward the MAX30102 red LED was dark on battery (out of the
+enclosure). On USB the board is fully healthy — boot log shows `Sensor ready`, live IR ~27k, buffered
+flash intact. Follow-up: `battery_blink` was flashed and **CONFIRMED the board powers and boots on
+battery** (LED kept blinking), so the cell and BAT/JST joint are sound — the earlier battery-side
+suspicion did NOT hold. The ~20 min "death" is now attributed to the **Mac's Bluetooth stack wedging
+after laptop sleep** (bleak/CoreBluetooth stuck on endless "Not in range"), a client-side capture
+dropout, not a battery or firmware fault. If a capture stalls, first wake/reset Bluetooth on the Mac
+before suspecting hardware.
 
 **Verifying the battery — the serial monitor CANNOT do it** (serial rides USB; unplugging USB
 always kills the monitor regardless of battery state). Use USB-independent signals:
@@ -155,9 +188,31 @@ always kills the monitor regardless of battery state). Use USB-independent signa
   firmware** (`max30102_hr_ble_log`: 240 MHz + BLE radio never sleeps → the same root cause as the
   ~3–4 h runtime). Distinguish from the fault above: benign = only the XIAO module is warm, the cell
   stays cool, warmth stabilizes, and USB-only is equally warm; fault = the LiPo **cell** itself is
-  warm/swelling or the temperature keeps climbing → unplug. (Observed 2026-07-23; cell-vs-module
-  check not yet done. Fix if wasteful: light-sleep between 1 Hz samples, lower BLE TX power,
-  `setCpuFrequencyMhz` 80–160 — all cut heat and extend runtime together.)
+  warm/swelling or the temperature keeps climbing → unplug. Fix if wasteful: light-sleep between
+  samples, lower BLE TX power, `setCpuFrequencyMhz` 80–160 — all cut heat and extend runtime together.
+- **Enclosure overheat resolved (2026-07-24): the heat is board-side, NOT the battery.** While
+  charging over USB **sealed in the enclosure**, the XIAO got too-hot-to-touch after ~30 min; it
+  cooled the moment it was removed. Cell-vs-module check (with the NEW cell): the **XIAO module was
+  hot, the cell stayed cool** → not a LiPo-fire fault. Cumulative causes: always-on 240 MHz + BLE +
+  the **+9 dBm (P9) TX boost** (a mistake — see antenna note) + a **ventless enclosure trapping all
+  the heat** (and possibly compressing a bare solder joint into a short). Working-tree fix (queued,
+  NOT yet flashed): **CPU 240→160 MHz** and **TX P9→P3** in `src/max30102_hr_ble_log/main.cpp` CONFIG
+  block — cuts idle current/heat and extends runtime. **Do NOT charge sealed in the enclosure or
+  unattended**; charge bare on a non-flammable surface. Bare-charge test is the fork: merely warm =
+  it was the enclosure (needs **ventilation slots + insulation over the bare MAX30102 joints** before
+  sealed reuse); still too-hot bare = board-level fault (short, or charge IC damaged by the earlier
+  reverse-polarity episode → use a standalone LiPo charger).
+  **Session-end escalation (2026-07-24):** overheat recurred within only **a few minutes** of USB
+  charging (new cell, cell cool, module too-hot-to-touch), so the working conclusion now leans
+  **board-level hardware fault** — firmware heat-cuts (160 MHz/P3) reduce compute+radio draw but
+  **cannot** fix a short or a damaged charge IC. Recommendation: **retire this XIAO**, charge the
+  good cell on a standalone LiPo charger, and bring up a **fresh board with the U.FL antenna
+  installed**. Not a clean bare-charge test yet, so the fork above is not formally closed — but do
+  not burn time re-diagnosing runtime/heat on this board.
+- **The OLD LiPo cell is likely damaged (deep-discharged to death) — retired.** Its ~45 min runtime
+  (vs the expected ~3–4 h) is an invalid measurement from a collapsed-capacity cell, not the firmware's
+  real draw; the NEW cell charges cool. Re-measure runtime fresh on the new cell after flashing the
+  160 MHz/P3 build.
 
 **I2C diagnostic heuristics:**
 - Random/shifting addresses each scan = floating bus = power/ground fault (not contact, not firmware).
@@ -196,7 +251,12 @@ deliberately, to dodge a build trap (see Known Toolchain Issues), and the patter
 **HR beat detection:** SparkFun `checkForBeat` + 4-beat rolling `beatAvg`, kept as-is. It needs the small
 AC pulse ripple riding on the DC — a flat high steady DC (~119–122k, "pressing too hard") defeats it.
 Skip the first beat until `lastBeat != 0` (else a phantom frozen `BPM=4.6`). Serial throttled to one
-summary line/sec.
+summary line/sec. **HR is only validated at the FINGERTIP** — a first on-wrist attempt (2026-07-24)
+gave garbage (BPM bouncing 0↔250, `beats`≈0), but it ran on the un-reflashed bad-`0x1F` firmware so it
+is inconclusive, not proof the algorithm fails on wrist. Wrist PPG is weaker/noisier than fingertip;
+if fingertip-tuned `checkForBeat` doesn't transfer once `0x0A` is reflashed, the proposed path is a
+raw-IR capture → DC-removal + 0.7–3.5 Hz band-pass + autocorrelation/FFT pipeline (replacing beat
+counting). Not built. This matters because the target form factor is a wristband.
 
 **BLE HR (`max30102_hr_ble`):** broadcasts as `Wearable-HR` — standard Heart Rate service (0x180D) for
 generic apps + a custom telemetry notify with CSV `t_ms,avg_bpm,last_bpm,beats,ir,finger`. Untethered
@@ -233,7 +293,9 @@ offline. A fast ~10 lines/sec burst on connect with `t_ms` stepping ~3000/line i
 draining, not a bug.
 **BLE link is unstable even in-range (2026-07-22):** drops recur every ~40–90 s at 5+ ft. Leading
 suspicion is the **detachable U.FL antenna not fully seated** — check that before trusting any TX-power
-tuning. (Uncommitted `src/max30102_hr_ble_log/` edits add a CONFIG block, +9 dBm TX power `P9`, and a 6 s
+tuning. (Uncommitted `src/max30102_hr_ble_log/` edits add a CONFIG block, TX power (now `P3` — was
+`P9`, reverted 2026-07-24 after the antenna diagnosis + overheat, see Board/battery notes), CPU clock
+`CPU_MHZ=160` (was 240, for heat/runtime), and a 6 s
 supervision timeout `CONN_TIMEOUT=600` to fight the drops, plus `RED_PULSE_AMPLITUDE` 0x0A→0x1F for
 stronger finger signal, plus a **30 s time-window BPM average** (`BPM_WINDOW_MS=30000`) that replaces the
 4-beat ring: `avg_bpm` now averages every beat in the last 30 s (`60000×(beats−1)÷span`), needs ≥2 beats
@@ -249,6 +311,24 @@ still, light fingertip contact is the fix.
 **Client wall-clock timestamps (2026-07-22):** `ble_hr_stream.py` now prepends a `recv_ts` receive-time
 column/print to each line (Mac-side, no flash needed). `recv_ts` is accurate for live data but is *drain*
 time, not sample time, during a back-fill burst — the device's `t_ms` remains the true relative clock.
+**Clock-anchor / true sample time (2026-07-23, UNCOMMITTED + NOT YET FLASHED):** the current working-tree
+edits to `src/max30102_hr_ble_log/main.cpp` (+`anchorSent`) and `ble_hr_stream.py` add a second column,
+`reading_ts`, giving the *actual sample time* even for back-filled rows. Mechanism: the firmware sends its
+current uptime as `#now,<millis()>` as the **first** telemetry notify of every connection (reset in
+`onDisconnect`); the client pairs that with its wall clock into a boot anchor and maps each line's `t_ms`
+back to a real timestamp. Rows from a **prior** boot (device rebooted mid-buffer — `t_ms` > current uptime,
+since `t_ms` resets on reboot) are unknowable, so `reading_ts` is left **blank** rather than guessed.
+Compiled only — the board wouldn't enumerate at session end, so this was NOT flashed; the active firmware is
+still the 2026-07-23 CONFIG/P9/30 s-window build above, which does not emit `#now`. `reading_ts` stays blank
+until this is flashed.
+**`RED_PULSE_AMPLITUDE` 0x1F REVERTED → 0x0A (2026-07-23, working tree, NOT YET FLASHED):** the earlier
+0x0A→0x1F bump was the WRONG call — it pushed baseline IR to ~130k+, which flattens the AC pulse ripple
+`checkForBeat` needs, so the `beats` column sat at ~0, `last_bpm` fired only every tens of seconds (below
+the 20 BPM floor → rejected), and `avg_bpm` never populated. 0x0A historically gives ~118k IR + reliable
+74–82 BPM. Source is now back at 0x0A (built green) but the board wasn't enumerating at session end, so the
+**active on-board firmware still runs the bad 0x1F** — reflash to fix. Live proof of the fault: IR pinned
+~125–144k, `beats`≈0, `avg_bpm`=0 the whole capture. Lighter/stiller fingertip contact (IR ~100–120k) is
+the other half of the fix.
 
 ## Known Toolchain Issues
 

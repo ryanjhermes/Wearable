@@ -30,10 +30,12 @@ HR_SERVICE = "0000180d-0000-1000-8000-00805f9b34fb"
 HR_CHAR = "00002a37-0000-1000-8000-00805f9b34fb"
 
 FIELDS = ["t_ms", "avg_bpm", "last_bpm", "beats", "ir", "finger"]
-# recv_ts = wall-clock time the Mac received the line. Accurate for LIVE data;
-# for a back-fill burst it's the drain time, not the original sample time (use
-# the device's t_ms for relative sample timing).
-CSV_FIELDS = ["recv_ts"] + FIELDS
+# recv_ts    = wall-clock time the Mac received the line (drain time for back-fill).
+# reading_ts = reconstructed true time the reading was taken. The device sends its
+#              current uptime as "#now,<ms>" on connect; pairing that with the Mac
+#              clock gives an anchor, and each line's t_ms maps to a real timestamp
+#              — so a back-filled row shows when it was SAMPLED, not when it drained.
+CSV_FIELDS = ["recv_ts", "reading_ts"] + FIELDS
 
 
 async def find_device(timeout: float = 15.0):
@@ -86,16 +88,45 @@ async def run(save_path: Path | None) -> None:
             fp.flush()
         print(f"Saving → {save_path.resolve()}")
 
+    # Clock anchor for the current connection: maps device uptime (t_ms) to the
+    # Mac wall clock. Refreshed by each "#now,<ms>" the device sends on connect.
+    anchor: dict = {}
+
+    def reading_ts_for(t_ms: int) -> str:
+        # True sample time = boot_epoch + t_ms/1000, valid only for the boot the
+        # anchor describes. A back-filled row from a PRIOR boot (device rebooted
+        # mid-buffer, e.g. battery died) has t_ms > current uptime → unknowable, so
+        # leave it blank rather than guess. See CLAUDE.md (t_ms resets on reboot).
+        if "epoch" not in anchor or not (0 <= t_ms <= anchor["uptime"] + 2000):
+            return ""
+        return datetime.fromtimestamp(anchor["epoch"] + t_ms / 1000).isoformat(
+            timespec="seconds"
+        )
+
     def on_telem(_handle: int, data: bytearray) -> None:
         now = datetime.now()
         line = data.decode("utf-8", errors="replace").strip()
-        print(f"{now:%H:%M:%S}  {line}")
-        if writer:
-            parts = line.split(",")
-            # Skip the CSV header that leads a store-and-forward back-fill burst.
-            if len(parts) == len(FIELDS) and parts[0].isdigit():
-                writer.writerow([now.isoformat(timespec="seconds")] + parts)
+
+        if line.startswith("#now,"):
+            try:
+                uptime = int(line.split(",", 1)[1])
+                anchor["uptime"] = uptime
+                anchor["epoch"] = now.timestamp() - uptime / 1000
+                print(f"{now:%H:%M:%S}  [clock anchored: uptime={uptime} ms]")
+            except (ValueError, IndexError):
+                pass
+            return
+
+        parts = line.split(",")
+        # Skip the CSV header that leads a store-and-forward back-fill burst.
+        if len(parts) == len(FIELDS) and parts[0].isdigit():
+            rts = reading_ts_for(int(parts[0]))
+            print(f"{now:%H:%M:%S}  reading={rts or '?'}  {line}")
+            if writer:
+                writer.writerow([now.isoformat(timespec="seconds"), rts] + parts)
                 fp.flush()
+        else:
+            print(f"{now:%H:%M:%S}  {line}")
 
     def on_hr(_handle: int, data: bytearray) -> None:
         bpm = parse_hr(data)

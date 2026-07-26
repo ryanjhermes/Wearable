@@ -41,11 +41,19 @@ static const int  BPM_MIN = 20;                 // reject beats outside this ban
 static const int  BPM_MAX = 255;
 static const unsigned long BPM_WINDOW_MS = 30000;  // avg BPM over the last N ms of beats
 static const int  BEAT_CAP = 200;               // max beats held (>= BPM_MAX over the window)
-static const byte RED_PULSE_AMPLITUDE = 0x1F;   // MAX30102 LED current 0x00-0xFF
+static const byte RED_PULSE_AMPLITUDE = 0x0A;   // MAX30102 LED current 0x00-0xFF
+                                                // (0x0A historically gives ~118k IR + reliable
+                                                //  beats; higher pushes DC up and flattens the AC)
+
+// Power / thermal
+static const int CPU_MHZ = 160;  // 160 vs 240 cuts idle current + heat; BLE fine at 160
 
 // BLE
 static const char *DEVICE_NAME = "Wearable-HR";
-static const esp_power_level_t BLE_TX_POWER = ESP_PWR_LVL_P9;  // +9 dBm (max) for range
+// Moderate TX power. Was P9 (+9 dBm max) to fight drops, but those were the MISSING
+// external antenna, not range — max TX just added heat/current for nothing. With the
+// antenna installed, P3 is plenty for room range. (See CLAUDE.md Board/antenna note.)
+static const esp_power_level_t BLE_TX_POWER = ESP_PWR_LVL_P3;  // +3 dBm
 // Connection params applied on connect (survive brief RF fades before dropping):
 static const uint16_t CONN_INTERVAL_MIN = 0x10;  // 20 ms  (units of 1.25 ms)
 static const uint16_t CONN_INTERVAL_MAX = 0x20;  // 40 ms
@@ -86,6 +94,7 @@ long lastOffsetSave = 0;    // throttle cursor persistence
 bool deviceConnected = false;
 bool oldDeviceConnected = false;
 long connectedAt = 0;       // for a short post-connect subscribe grace
+bool anchorSent = false;    // sent the "#now,<uptime>" clock anchor this connection?
 
 static const char *HR_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb";
 static const char *HR_MEAS_CHAR_UUID = "00002a37-0000-1000-8000-00805f9b34fb";
@@ -107,6 +116,7 @@ class ServerCallbacks : public BLEServerCallbacks {
   }
   void onDisconnect(BLEServer *server) {
     deviceConnected = false;
+    anchorSent = false;  // re-anchor the clock on the next connection
     BLEDevice::startAdvertising();
   }
 };
@@ -190,6 +200,18 @@ void appendLogLine(unsigned long t_ms, int avg, float last, int beats, long ir,
 void drainToBle() {
   if (!deviceConnected || telemChar == nullptr) return;
   if (millis() - connectedAt < 1500) return;  // let the client subscribe first
+
+  // First message of every connection: the device's current uptime. The client
+  // pairs this with its wall clock to convert each line's t_ms into the real
+  // reading time — so back-filled rows get their true timestamp, not drain time.
+  if (!anchorSent) {
+    char nowbuf[24];
+    snprintf(nowbuf, sizeof(nowbuf), "#now,%lu", millis());
+    telemChar->setValue((uint8_t *)nowbuf, strlen(nowbuf));
+    telemChar->notify();
+    anchorSent = true;
+    delay(NOTIFY_GAP_MS);
+  }
 
   size_t sz = logSize();
   if (sentOffset >= sz) return;  // caught up — nothing to send
@@ -341,6 +363,7 @@ void handleSerialCommands() {
 void setup() {
   Serial.begin(115200);
   delay(2000);
+  setCpuFrequencyMhz(CPU_MHZ);  // lower clock → less idle current + heat
   Serial.println("MAX30102 HR — BLE store-and-forward");
 
   setupBle();

@@ -4,6 +4,34 @@ Historical bring-up / debugging narrative moved out of CLAUDE.md. Not authoritat
 current state — CLAUDE.md wins on any conflict. Kept because the *root causes* and
 *diagnostic heuristics* here are reusable if the same faults recur.
 
+## Board thermal fault — excessive current draw (2026-07-24)
+
+**Symptom:** the XIAO **module** (not the cell) got too hot to touch after a few minutes of USB
+charging, **bare (out of the enclosure)**, with a fresh known-good LiPo that stayed cool.
+
+**Diagnosis: a board-level power fault — excessive current draw (a short on a power rail
+VBUS/3V3/BAT-to-GND, or a damaged charge IC).** One root cause unifies every symptom this session:
+noticeable warmth on battery, ~45 min runtime (not just a weak old cell), and too-hot on charge =
+excess current, on charge routed through the charge IC. Being hot **bare** rules out the enclosure
+(no compression short, no heat-trapping) — the fault is intrinsic to the board.
+
+**Firmware cannot fix this.** The LiPo charge IC and power rails are hardware; they dissipate watts
+independent of any code. CPU-frequency / BLE-TX-power cuts only shave tens of mA of compute/radio
+heat — irrelevant to a charge-path fault. (Those cuts were still made in `max30102_hr_ble_log`:
+CPU 240→160 MHz, TX P9→P3 — the P9 was a wrong call to fight drops that were actually the missing
+antenna. Good for runtime/heat generally, but NOT a fix for this fault.)
+
+**Consistent with this board's abuse history:** the earlier reverse-polarity episode (charge IC may
+not have fully survived), prior overheating, the fried MLX90614, and repeated resoldering of the
+direct-wired MAX30102.
+
+**Recommendation:** stop charging through the board (protects the good cell; safety). Treat this
+XIAO as **likely damaged — replace it** (second board swap; the first was 2026-07-19). On the
+replacement: install the U.FL antenna, re-verify BAT polarity, insulate the bare joints. Charge
+cells meanwhile with a standalone LiPo charger, not the board. No multimeter on hand → visual
+inspection only: look for a solder bridge / stray strand between a power pin and GND near the BAT
+pads, USB-C/charge area, and the direct-wired MAX30102 joints.
+
 ## Board swap (2026-07-19)
 
 The user replaced the original XIAO (old serial `SER=E0:72:A1:FC:4F:CC`) with a fresh
