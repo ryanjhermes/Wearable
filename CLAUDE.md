@@ -63,6 +63,12 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
 
 - `src/<env>/main.cpp` — firmware, one folder per PlatformIO env (see table). Split from a single
   `src/main.cpp` on 2026-07-12 via `build_src_filter`; shared settings live under `[env]`.
+  **Layout drift (2026-07-29): only `max30102_hr_ble_log` and `max30102_raw_ir` remain live under
+  `src/`; the other 10 env folders were moved to `src/archive/`.** Their `platformio.ini`
+  `build_src_filter` paths were NOT updated, so those envs' filters now match nothing and a bare
+  `pio run` (all envs) fails — the two live envs still build. Update the filter to `+<archive/<env>/>`
+  or move a folder back before building an archived env. Also note `[env:max30102_heartrate]` has a
+  stray typo — `build_src_filter =u+<...>` (the `u` is invalid).
 - `platformio.ini` — build/upload/monitor config; **source of truth for the serial port**.
 - `monitor/filter_*.py` — serial-monitor capture filters: `filter_csv_capture.py`,
   `filter_motion_csv.py`, `filter_flash_dump.py`. Wired per-env via `monitor_filters`.
