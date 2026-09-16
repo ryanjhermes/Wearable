@@ -4,8 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Experimental wearable prototype on a Seeed Studio XIAO ESP32S3. Collects body/environment signals
-via I2C sensors. Not a medical device — readings are experimental.
+Experimental wearable transitioning from an archived Seeed Studio XIAO ESP32S3 prototype to a
+custom ESP32-C3 fab PCB. It collects body/environment signals via I2C sensors. Not a medical device;
+readings are experimental.
+
+> **Current v2 hardware authority:** [`parts/V2_BOM.md`](parts/V2_BOM.md). It supersedes older
+> candidate-BOM and power-path notes elsewhere in this file. Component folders contain evidence;
+> once a schematic exists, its generated BOM owns reference designators and quantities.
 
 **Status:** Phase 3 (sensor reads) is **COMPLETE**. MAX30102 heart rate and BMI160 motion both
 read live and are CONFIRMED simultaneously on the shared I2C bus. BLE HR streaming works
@@ -48,17 +53,16 @@ recoverable from commit `ebf99dc` if ever needed. The new board starts from scra
   self-heat corrupted the MLX90614 readings was inference from `archive/v1/docs/hardware_debug_log.md`, never
   measured. Treat as optional cheap insurance at layout time, not a requirement.
 
-### Part selection — NOTHING IS FINAL (user, 2026-09-14)
+### V2 fab-board part selection
 
-**Every row below is a CANDIDATE under evaluation, not a decision.** An earlier revision of this file
-wrote these up as "DECIDED" — that was wrong and has been reverted. Two unresolved questions gate the
-whole BOM; neither is answered:
+The fab track and core devices are selected. Exact part numbers, passives, power architecture, and
+the remaining battery verification are maintained in `parts/V2_BOM.md`. Green PPG, permanent battery
+attachment, and supervised off-wrist charging are locked. The table below
+includes historical evaluation context and must not override that file.
 
-1. **Prototyping track or fab track?** Breakout modules (bought on Amazon, hand-wireable) and bare
-   chips (bought via LCSC/Mouser, machine-assembled by the fab) are *different supply channels,
-   different sizes, and different skill requirements*. Which track this project is on is NOT decided,
-   and the answer changes every row below. Bare LGA/OLGA chips cannot be hand-soldered.
-2. **Wrist PPG wavelength is UNDIAGNOSED.** The green-LED argument for MAX30101 rests on commercial
+1. **Fab track is selected.** Bare LGA/OLGA parts will be machine assembled; the old breakout track
+   remains only in `archive/v1/`.
+2. **Wrist PPG wavelength is still unvalidated.** The green-LED argument for MAX30101 rests on commercial
    practice (Apple/Fitbit/Whoop use green on the wrist), NOT on any measurement from this project.
    The one on-wrist attempt (2026-07-24) ran on known-bad firmware and is inconclusive. **The
    diagnostic to settle it already exists and has NEVER been run** — `archive/v1/src/max30102_raw_ir/` +
@@ -67,13 +71,13 @@ whole BOM; neither is answered:
 
 | Function | Currently owned | Candidate | Why considered | Status |
 |---|---|---|---|---|
-| PPG / HR | MAX30102 (MH-ET LIVE breakout, ~20.5×15.5mm) | MAX30101 | Adds a **green** LED (red/IR is a fingertip/SpO₂ combo); wrist PPG in commercial devices is green | **MAX30101 CHOSEN for the fab board (user, 2026-09-15):** *"Let's go with the MAX30101 then, since a previous analysis said green is better for this use case."* This settles the sensor pick for the carrier PCB. **Caveat: the wrist-PPG wavelength test above STILL has not been run** — the choice rests on commercial practice, not a measurement, so run the raw-IR capture before committing money. (Prior OPEN framing: on the prototyping/Amazon track the fallback was **another MAX30102 breakout** — small MAX30101 breakouts aren't on Amazon, 2026-09-14 — now moot for the fab track.) **Fab track sourcing CONFIRMED (2026-09-14):** `MAX30101EFD+T` = LCSC **C2859066**, in stock ~319, Extended, ~$8.34@qty1 — the biggest BOM sourcing risk, now resolved |
-| Temp | MLX90614 GY-906 (suspected dead, tall TO-39 can) | TMP117 or MAX30205 | Contact temp beats non-contact IR for body temp; kills the tallest part | **OPEN** — TMP117 leads, not committed. Both <1mm tall (no height impact). Decider is power: TMP117 ~3.5µA active (WSON-6 2.0×2.0mm, ±0.1°C over −20…50°C); MAX30205 **~600µA active** (TDFN-8 3.0×3.0mm, ±0.1°C only in 37–39°C) — the 600µA matters on the 250mAh cell. **Fab stock (2026-09-14):** MAX30205 (C2917019/C476171) is **pre-order only, 0 stock**. **TMP117AIDRVR now sourced & filed (2026-09-15):** LCSC **C699536**, WSON-6 2.0×2.0×0.75mm, datasheet in `parts/tmp117/` |
+| PPG / HR | MAX30102 (MH-ET LIVE breakout, ~20.5×15.5mm) | MAX30101 | Adds a **green** LED (red/IR is a fingertip/SpO₂ combo); wrist PPG in commercial devices is green | **MAX30101 CHOSEN for the fab board (user, 2026-09-15):** *"Let's go with the MAX30101 then, since a previous analysis said green is better for this use case."* This settles the sensor pick for the carrier PCB. **Caveat: the wrist-PPG wavelength test above STILL has not been run** — the choice rests on commercial practice, not a measurement. Because MAX30101 includes red, IR, and green, the test is now post-arrival validation rather than an ordering gate. **Fab track sourcing CONFIRMED (2026-09-14):** `MAX30101EFD+T` = LCSC **C2859066**, in stock ~319, Extended, ~$8.34@qty1 — the biggest BOM sourcing risk, now resolved |
+| Temp | MLX90614 GY-906 (suspected dead, tall TO-39 can) | TMP117AIDRVR | Contact temperature, low power, and <1 mm height | **SELECTED** — LCSC **C699536**, WSON-6 2.0×2.0×0.75 mm; evidence in `parts/tmp117/` |
 | IMU | BMI160 (GY-BMI160 breakout) | Keep BMI160 | Only needs to subtract activity from HR; existing driver works | **BMI160 confirmed DEAD on fab track (2026-09-14):** LCSC **C94021** is **consign-only, 0 stock** (the Bosch-EOL outcome) — not machine-placeable by JLCPCB. So on the fab track the accel is **LSM6DS3TR-C** (near-identical footprint; port ≈ axis-remap + register-address changes, ~a day of firmware). Keeping BMI160 only remains viable on the prototype/breakout track. User declined an upgrade to LIS2DH12 (2026-09-14) unless it's a large improvement. **LSM6DS3TR-C now sourced & filed (2026-09-15):** LCSC **C967633**, datasheet in `parts/lsm6ds3tr-c/`. It is **6-axis — the gyro is free**; use it for sway/tremor/gait-instability BAC features, not only activity-subtraction |
-| MCU | XIAO ESP32S3 (dev board) | ESP32-C3-MINI-1 (module) | A dev board on a carrier = two stacked PCBs, violating the one-board constraint | **OPEN** — see MCU note below. **`-N4` variant (4MB flash) now sourced & filed (2026-09-15):** LCSC **C2838502**, datasheet in `parts/esp32-c3-mini-1/` |
+| MCU | XIAO ESP32S3 (dev board) | ESP32-C3-MINI-1-N4 module | A dev board on a carrier = two stacked PCBs, violating the one-board constraint | **SELECTED** — LCSC **C2838502**, 4 MB flash; evidence in `parts/esp32-c3-mini-1/` |
 | Battery | LiPo 402030 (30×20×4, 250mAh) | unchanged for now | Pins the height budget | Owned |
 | EDA/GSR | none | analog front end | 4th Kaczor channel; see Application section | **CUT FROM V2 (user, 2026-09-15)** — "no EDA, maybe for v3... we'll need to get v2 working in the first place." Complexity reduction to maximise first-spin success. Costs the strongest single BAC predictor; revisit in v3. `parts/mcp6002/` kept as research, NOT on the BOM |
-| Ambient temp+humidity | none | SHT40-AD1B-R3 | **De-confounds skin temp/EDA** — a hot/humid room raises skin temp and sweat with no alcohol, corrupting the BAC signal; needed to regress out environment | **New candidate (2026-09-15), filed** — LCSC **C2848306**, ~2×2mm I2C, datasheet in `parts/sht40/`. User chose the R3 sub-variant; R2-vs-R3 question resolved to R3 (suffix = tape-and-reel qty only, electrically identical) |
+| Ambient temp+humidity | none | SHT40-AD1B-R3 | De-confounds skin temperature; must be vented to ambient air | **SELECTED** — LCSC **C2848306**; evidence in `parts/sht40/` |
 
 **Fab-track I2C bus has no address collisions (2026-09-15):** the four selected sensors sit at
 distinct addresses — SHT40 `0x44`, TMP117 `0x48` (strappable 0x48–0x4B), MAX30101 `0x57`,
@@ -92,8 +96,9 @@ board you must supply **1.8V yourself** (a second LDO) **plus a separate higher 
 design goes from one rail to **three**. The I2C pins are spec'd to tolerate a 3.3V bus even with 1.8V
 VDD, so the shared bus is fine. **All three now datasheet-verified (2026-09-15, filed in
 `parts/max30101/`):** VDD 1.7–2.0V (abs max **+2.2V** — 3.3V destroys it); SDA/SCL abs max +6.0V so the
-3.3V bus needs **no level shifting**; and **VLED+ is 3.1–5.0V and runs straight off the LiPo (3.0–4.2V)
-— NO boost converter needed**, so the "third rail" is just a direct LiPo tap, not extra silicon. This breakout→bare-chip
+3.3V bus needs **no level shifting**. VLED+ is **3.1–5.0 V for red/IR but 4.5–5.5 V for green**.
+A single LiPo cannot guarantee green; `parts/V2_BOM.md` defines the mandatory 4.704 V TPS61099 boost.
+Without that block the board would be red/IR-only. This breakout→bare-chip
 "the breakout was doing work you didn't know about" trap must be re-checked for every part picked.
 **Concrete instance already known: I2C pull-ups.** The prototype breakouts each carry their own
 SDA/SCL pull-ups; the bare chips do NOT, so the carrier board must add **one pair of ~4.7k pull-ups**
@@ -126,37 +131,30 @@ folder + datasheet: `parts/me6211/`, `parts/xc6206/`, `parts/tp4054/`, `parts/us
 - **ME6211C33M5G-N — CE (pin 3) MUST be tied high; floating = no output, no other symptom** (board
   looks dead). Pinout `1=VIN, 2=VSS, 3=CE, 4=NC, 5=VOUT` (p.4). **Do NOT substitute the ME6211*H*** —
   C and H series differ in enable *polarity*, same package/voltage.
-- **XC6206P182MR — pinout `1=VSS, 2=VIN, 3=VOUT`; ground is on pin 1**, not the usual SOT-23-3 spot.
+- **XC6206P182MR — verified SOT-23 pinout `1=VSS, 2=VOUT, 3=VIN`.** The older reversed note was wrong.
 - **TP4054 — I_charge = 1000/R_PROG, so R_PROG = 10kΩ 1% → 100mA (0.4C)** — gentle on the 250mAh cell,
   ~3h charge (supersedes the earlier "≤0.5C/~125mA" estimate).
 
-**Charge-path load-sharing is a real electrical GAP, not just a part choice (assistant, 2026-09-15) —
-the one addition worth breaking the simplicity goal for.** As drafted, the 3.3V LDO input sits on
-`VBAT` with no power switch, so on USB the TP4054 charges the cell *while* the system draws ~50–70mA
-from the same node. The TP4054 terminates at ~1/10 of the program current (~10mA at 100mA setting);
-with system load on that node **the threshold may never be reached → charging never cleanly terminates**
-and the cell is held at float. Fix: a **load-sharing P-FET + resistor (~2–3 parts)** so the system runs
-off VBUS when plugged in, leaving the charger to see only the battery. (A power switch is the
-alternative but means a hole in a sealed wristband.) Not yet designed in.
+**Charge-path load sharing is resolved (2026-09-15).** V2 uses the Microchip AN1149-style discrete
+topology: AO3401A P-MOSF + SS14 Schottky + 100 kOhm gate pulldown. USB powers VSYS while attached and
+the TP4054 sees only battery current, so termination does not depend on firmware. Exact orientation
+and rationale are in `parts/V2_BOM.md` and `parts/_support/DECISIONS.md`.
 
-**Remaining schematic-blockers beyond the charge path (2026-09-15):** (1) the **~22 passives still have
-NO LCSC part numbers** — JLCPCB assembly needs a real number for every R/C (all Basic, trivial, but not
-done); (2) **no KiCad symbols/footprints exist** — `parts/` holds datasheets only; KiCad is installed at
-`/Applications/KiCad` and `easyeda2kicad` can generate both from the LCSC numbers (why recording them
-first mattered), or EasyEDA's native LCSC integration removes this gap for a first board; (3) unmade
-decisions a schematic will force — **battery attach (solder pads vs JST), I2C pins (proposed
-SDA=GPIO6/SCL=GPIO7, unconfirmed), battery-sense ADC pin (GPIO0/1/3/4 — NOT GPIO2, strapping), power
-switch (interacts with the charge path).** Part *selection* is complete; these are what's left.
+**Remaining pre-schematic evidence (2026-09-15):** identify the user's exact 250 mAh cell and verify
+its protection board, polarity, physical dimensions, and >=100 mA charge rating. Green PPG is
+mandatory, the cell is permanently soldered, and charging is supervised/off-wrist. All passives have
+exact MPNs and LCSC numbers. **No KiCad symbols/footprints exist yet** — `parts/` holds evidence only;
+every imported symbol and footprint must be checked against the manufacturer datasheet. Proposed
+fixed signals are SDA=GPIO6, SCL=GPIO7, and battery ADC=GPIO3. GPIO2/8/9 remain dedicated boot straps
+with 10 kOhm pull-ups.
 
 **No BOM generator was built, deliberately (assistant, 2026-09-15).** Quantities/refdes live in the
 schematic, not in `parts/`, so a `parts/`-reading script could only ever emit a parts *list* and would
 become a second source of truth that disagrees with KiCad's netlist BOM. Sequencing is **schematic →
-KiCad BOM (authoritative, with quantities) → cross-check against `parts/`** for LCSC#/sourcing. What
-exists instead is **`parts/check_parts.py`** — a pre-order sourcing gate that checks each part folder
-for a valid `datasheet.pdf` (verifies the `%PDF` magic bytes — curl'd LCSC pages came back as HTML
-error pages, so this earns its keep), flags folders with no LCSC number, emits the paste-ready code
-list, and exits non-zero while gaps remain. **Caveat: it only scans folders, so its "No gaps" does NOT
-cover the passives-lack-LCSC-numbers gap above.**
+KiCad BOM (authoritative, with quantities) → cross-check against `parts/V2_BOM.md`** for
+LCSC#/sourcing. `parts/check_parts.py` is only an evidence-integrity gate: it checks part folders for
+LCSC codes, missing/corrupt/duplicated PDFs, unresolved merge markers, and broken relative links.
+Its “No gaps” result is not schematic, connectivity, quantity, stock, or safety validation.
 
 **Wavelength test no longer gates ordering — MAX30101 is a SUPERSET of the MAX30102 (2026-09-15):** it
 carries red (660nm), IR (880nm) *and* green (527nm) in the same package/`0x57`/library, so buying it
@@ -202,28 +200,19 @@ missing channel is **EDA/GSR**.
 > skin response — skin conductance between two skin electrodes, which rises with sweat-gland activity.
 > *Not* to be confused with "EDA" meaning Electronic Design Automation (KiCad). **LCSC** = the
 > component distributor that **JLCPCB** (PCB fab) pulls parts from when it assembles a board — it
-> matters only on the fab track, because the fab can only place parts LCSC stocks.
 
 **V2 BOM DECISION — EDA IS OUT (user, 2026-09-15).** Deferred to v3. The reasoning was explicitly
 about scope control, not merit: get a simpler board working first. Accept that the v2 dataset will
 have 3 of Kaczor's 4 channels (HR/HRV, skin temp, accelerometry) and no electrodermal channel, and
 that adding it later is a full respin. `parts/mcp6002/` stays as filed research.
 
-EDA is **analog, not I2C** — read as a voltage on an ADC pin via oversampled `analogRead()`, gated on
-BMI160 motion ≈ 0. **ADC pin picked (2026-09-15): GPIO3 (ADC1_CH3)** — ADC1 spans GPIO0–GPIO4, but
-**GPIO2 is a strapping pin, do not use it**; GPIO3 is the clean channel (filed in `parts/mcp6002/`). **Open V1 decision (assistant recommends YES, user not yet decided):** whether to
-design EDA into the carrier PCB — it needs two skin electrodes + a small front end (op-amp, 2
-resistors, cap, 1 ADC pin, 2 gold skin pads); adding it after a fab run is a full board respin, and
-EDA is often the strongest single BAC predictor. **Fab constraint if EDA is included (2026-09-15):**
-the skin electrodes are **ENIG-plated pads on the board itself, not a purchased part** — the board
-must be ordered with an **ENIG (gold) finish; the default HASL (tin/lead) corrodes against sweat.**
-Candidate front-end op-amp filed in `parts/mcp6002/` (MCP6002-I/SN, SOIC-8, LCSC **C116706**;
-alt `MCP6002-E/SN` = C636235; Basic/Extended not yet confirmed; alts TLV9002 / OPA2333)
-— its existence does NOT change the status: EDA-in-V1 is still an OPEN, undecided call.
+EDA is analog rather than I2C, but **it is not part of v2**. GPIO3 is reassigned to battery sensing.
+The MCP6002/electrode notes remain in `parts/mcp6002/` only as archived v3 research. Adding EDA later
+will require a board revision and, for skin electrodes, an appropriate corrosion-resistant finish.
 
 **V1 sensor scope locked down (user, 2026-09-15):** "**We won't be doing microphone or ECG.**" Also
 **ruled out for V1** (assistant analysis, user did not object): transdermal-alcohol (TAC) sensor,
-barometer, bioimpedance. Working recommendation is **EDA + SHT40, then stop** — adding more channels
+barometer, bioimpedance. Working v2 scope is **SHT40, then stop** — adding more channels
 worsens overfitting risk (self-labeled data + ~30 features on XGBoost will memorize sessions). MLX/
 non-contact IR is NOT needed — contact TMP117 replaces it.
 
@@ -295,11 +284,10 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
 - `archive/v1/src/<env>/main.cpp` — firmware, one folder per PlatformIO env (see table). Split from a single
   a single `src/main.cpp` on 2026-07-12 via `build_src_filter`; shared settings live under `[env]`.
   **Layout drift (2026-07-29): only `max30102_hr_ble_log` and `max30102_raw_ir` remain live at
-  the top of `src_dir`; the other 11 env folders sit under `archive/v1/src/archive/`.** Their `platformio.ini`
-  `build_src_filter` paths were NOT updated, so those envs' filters now match nothing and a bare
-  `pio run` (all envs) fails — the two live envs still build. Update the filter to `+<archive/<env>/>`
-  or move a folder back before building an archived env. Also note `[env:max30102_heartrate]` has a
-  stray typo — `build_src_filter =u+<...>` (the `u` is invalid).
+  the top of `src_dir`; the other 11 env folders sit under `archive/v1/src/archive/`.** The root
+  `platformio.ini` filters include that `archive/` prefix, so all 13 environments remain addressable.
+  This was repaired and all 13 environments compiled successfully on 2026-09-16; keep the directory
+  prefix if filters are edited later.
 - `platformio.ini` — build/upload/monitor config; **source of truth for the serial port**. Sets
   `src_dir = archive/v1/src` (firmware archived 2026-09-15 but still builds — see `archive/v1/README.md`).
 - `monitor/filter_*.py` — serial-monitor capture filters: `filter_csv_capture.py`,
@@ -320,24 +308,21 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
 - `data/` — **live** capture target for new runs (gitignored; scripts and monitor filters write
   here). Empty apart from `.gitkeep` — the 17 historical breakout-era CSVs moved to
   `archive/v1/data/` on 2026-09-15.
-- `parts/` — **candidate-component research for the fab-track BOM** (added 2026-09-14). One folder per
-  part, named by manufacturer part number in lowercase-kebab; each holds `README.md`, `datasheet.pdf`,
-  and `images/`. Copy `parts/_template/` to start one. **READMEs are now schematic-ready (2026-09-15):**
+- `parts/` — **v2 BOM authority and component evidence**. Start with `parts/V2_BOM.md`; one folder per
+  part holds `README.md` and `datasheet.pdf`. Copy `parts/_template/` to start one. **READMEs are
+  schematic-ready (2026-09-15):**
   beyond specs/availability/LCSC#, each part README carries a **complete pin table with net
   assignments**, a **required-externals table with values**, and layout notes — all extracted from the
-  datasheet with page refs; `parts/README.md` adds the system glue (the **three-rail power tree**, the
-  **I2C address map**, and a consolidated support-part list). Schematic-critical gotchas the breakouts
+  datasheet with page refs; `parts/V2_BOM.md` owns the power tree, exact passives, approval status,
+  and open decisions. Schematic-critical gotchas the breakouts
   hid, now filed in the part READMEs: MAX30101 **4.7µF on VLED+ is mandatory** (200mA LED pulses) + its
   6 N.C. pins still solder mechanically + PGND≠GND; LSM6DS3TR-C **CS(12) high or it boots SPI, SDx(2)/
   SCx(3) must be tied**; TMP117 **ADD0 must not float** + thermal-pad placement *is* the measurement;
-  ESP32-C3-MINI-1 **GPIO8 needs an external 10kΩ pull-up or it won't boot**, and **native USB on IO18/19
+  ESP32-C3-MINI-1 **GPIO2/8/9 each get a 10kΩ pull-up**, and **native USB on IO18/19
   means no UART bridge and no auto-reset transistors** (a real parts saving); SHT40 must vent to outside
-  air + be thermally isolated. Nothing in it is a decision — decisions live here.
-  `parts/check_parts.py` is a pre-order sourcing gate (datasheet `%PDF`-magic + LCSC# check, exits
-  non-zero on gaps) — folder-scan only, so it does NOT catch the passives that still lack LCSC numbers.
-  `parts/_reference/` is NOT per-part datasheets — it holds three cross-cutting ESP32-C3 design docs
-  (hardware design guidelines, DevKitM-1 reference schematic, C3 chip datasheet) to design the carrier
-  schematic against.
+  air + be thermally isolated. `parts/check_parts.py` checks evidence integrity only; use schematic
+  ERC and reconcile the generated BOM against `parts/V2_BOM.md`. `parts/_reference/` holds
+  cross-cutting ESP32-C3 and battery load-sharing references.
 - `enclosure/` — **v2 placeholder, intentionally empty of geometry.** Blocked on the fab PCB: the
   enclosure can't be dimensioned until the board outline is fixed. See `enclosure/README.md`. The
   v1 box moved to `archive/v1/enclosure/`.

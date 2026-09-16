@@ -8,9 +8,10 @@ fab-assembled PCB** (`parts/` for the BOM, `CLAUDE.md` for decisions).
 
 ## Why it was archived, not deleted
 
-The breakout prototype is still the only *working* hardware, and the next gating experiment —
-the wrist PPG raw-IR capture that decides MAX30101 vs MAX30102 — runs on it. `docs/wiring.md`
-is the wiring reference for that rig. Archived ≠ useless; archived = not the current design.
+The breakout prototype is still the only *working* hardware, and the next useful experiment —
+the wrist PPG raw-IR capture that validates wavelength and algorithm assumptions — runs on it.
+`docs/wiring.md` is the wiring reference for that rig. Archived ≠ useless; archived = not the
+current design.
 
 ## Contents
 
@@ -36,8 +37,8 @@ add `archive/v1/data/` to `.gitignore`.
 
 `data/` at the repo root stays live — scripts and monitor filters write new captures there.
 
-**There are still zero raw-IR captures in this set.** The wrist PPG diagnostic that gates the
-MAX30101-vs-MAX30102 decision has never been run.
+**There are still zero raw-IR captures in this set.** The wrist PPG diagnostic for wavelength and
+wrist-algorithm validation has never been run; MAX30101 selection is already locked.
 
 ## What was carried forward
 
@@ -65,12 +66,12 @@ Left as-is rather than rewritten — these are historical documents.
 
 `platformio.ini` stays at the repo root (PlatformIO requires it) and was repointed with
 `src_dir = archive/v1/src`, so every env still builds and uploads exactly as before. Verified with
-`pio project config` on 2026-09-15.
+a complete 13-environment `pio run` on 2026-09-16.
 
 This matters for one specific reason: **`src/max30102_raw_ir/` + `scripts/raw_ir_capture.py` +
-`scripts/plot_raw_ir.py` are the wrist-PPG diagnostic that has never been run**, and it gates the
-MAX30101-vs-MAX30102 decision — the largest line on the new board's BOM. Archived here, still
-runnable, still the next experiment.
+`scripts/plot_raw_ir.py` are the wrist-PPG diagnostic that has never been run.** MAX30101 is now
+selected because it preserves green, red, and IR in one package, so this test no longer gates the
+part choice; it remains the next experiment for wavelength and wrist-algorithm validation.
 
 `monitor/` stayed at the repo root: PlatformIO resolves `monitor_filters` relative to the project
 root, so moving it would break `csv_capture`, `motion_csv` and `flash_dump`.

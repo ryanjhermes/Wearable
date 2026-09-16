@@ -38,12 +38,12 @@ Only the pins this design uses. Everything else is `NC` (pins 4, 7, 9, 10, 15, 1
 | 1, 2, 11, 14, 36–53 | GND | `GND` — **all of them**, including the thermal/shield pads |
 | 3 | 3V3 | `+3V3` |
 | 8 | EN | **Must not float.** 10 kΩ to `+3V3` + 1 µF to `GND` (RC delay so the rail settles before boot) |
-| 22 | IO8 | **Strapping pin** — needs 10 kΩ pull-up to `+3V3` or the module will not boot |
-| 23 | IO9 | **Strapping pin = BOOT.** Internal pull-up; expose as a **test pad** pulled low to enter download mode |
-| 26 | IO18 | `USB_D−` |
-| 27 | IO19 | `USB_D+` |
-| 5 | IO2 | **Strapping pin** — avoid for general use |
-| 6 | IO3 | Free — ADC1_CH3, proposed EDA analog input |
+| 22 | IO8 | **Strapping pin** — 10 kΩ pull-up to `+3V3` |
+| 23 | IO9 | **Strapping pin = BOOT** — 10 kΩ pull-up to `+3V3`; expose test pad for pulling low |
+| 26 | IO18 | `USB_D−` through 22 Ohm series resistor |
+| 27 | IO19 | `USB_D+` through 22 Ohm series resistor |
+| 5 | IO2 | **Strapping pin** — 10 kΩ pull-up to `+3V3`; do not use for peripherals |
+| 6 | IO3 | `BAT_SENSE` from 1 MOhm / 1 MOhm divider; 100 nF to GND |
 | 20 | IO6 | Free — proposed `SDA` |
 | 21 | IO7 | Free — proposed `SCL` |
 | 30, 31 | RXD0 / TXD0 | UART0. Optional debug header; not needed (native USB) |
@@ -53,10 +53,12 @@ Only the pins this design uses. Everything else is `NC` (pins 4, 7, 9, 10, 15, 1
 
 ### Strapping pins — the boot-failure trap
 
-GPIO2, GPIO8, GPIO9 are sampled at reset (datasheet §4). All three default to floating, and a
-floating strapping pin is a board that boots intermittently or not at all. **GPIO8 needs an external
-10 kΩ pull-up.** Timing: EN must stay low until the rails are stable, and strapping values are held
-3 ms after EN goes high (Table 4-2).
+GPIO2, GPIO8, GPIO9 are sampled at reset (datasheet §4). GPIO2 and GPIO8 default floating; GPIO9 has
+an internal weak pull-up. SPI boot requires GPIO9 high; GPIO8 may have either value. Joint USB/UART
+download mode requires GPIO2 and GPIO8 high while GPIO9 is low. Fit 10 kΩ pull-ups on all three so
+normal boot and the test-pad recovery path are deterministic. Espressif specifically recommends the
+GPIO2 pull-up for glitch immunity. Keep peripherals off these nets. Strapping values are held 3 ms
+after EN goes high (Table 4-2).
 
 ### Recovery pads — mandatory given no LEDs and no buttons
 
@@ -74,10 +76,17 @@ They cost nothing.
 | R_EN | 10 kΩ | EN → 3V3 | EN must not float |
 | C_EN | 1 µF | EN → GND | Power-on reset delay |
 | R_IO8 | 10 kΩ | IO8 → 3V3 | Strapping |
+| R_IO2 | 10 kΩ | IO2 → 3V3 | Strapping; avoids download-mode glitches |
+| R_IO9 | 10 kΩ | IO9 → 3V3 | Normal boot; test pad can pull low for recovery |
+| R_USB_DM | 22 Ω | IO18 → USB D− | USB impedance/source damping; close to module |
+| R_USB_DP | 22 Ω | IO19 → USB D+ | USB impedance/source damping; close to module |
 
 Copy the known-good arrangement from `../_reference/esp32-c3-devkitm-1_reference_schematic.pdf`.
 **Native USB (IO18/IO19) means no USB-UART bridge and no DTR/RTS auto-reset transistors** — a real
 parts saving versus most ESP32 designs.
+
+Battery sensing uses GPIO3 (ADC1_CH3), a 1 MΩ / 1 MΩ divider, and 100 nF from the ADC node to ground.
+Do not use GPIO2 for it.
 
 ## Layout
 

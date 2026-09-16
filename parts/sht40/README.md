@@ -33,7 +33,8 @@ top side / vented, not the skin side.
 | 3 | VDD | `+3V3` |
 | 4 | VSS | `GND` |
 
-Die pad is **not** internally connected to any pin.
+The center pad is **not** internally connected. Sensirion recommends leaving it unsoldered and
+avoiding copper beneath it so heat is not conducted into the sensing element.
 
 ## Schematic — required externals
 
@@ -52,6 +53,7 @@ Sensirion's own guidance, and the reason this part can silently produce garbage:
 - **Thermally isolate from the PCB.** Self-heat from the board biases both temperature *and* the
   relative-humidity calculation that depends on it. Slot or cut-away around it, minimal copper
   connection, keep it far from the LDOs and MCU.
+- Do not solder the center pad or place copper beneath it.
 - Top side, opposite the skin-facing optics.
 - Humidity sensors drift with solder flux outgassing and IPA. Handle per Sensirion's reflow/cleaning
   notes and expect a settling period after assembly.

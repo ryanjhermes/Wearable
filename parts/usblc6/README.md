@@ -6,10 +6,17 @@
 | LCSC | **C7519** |
 | JLCPCB | **Extended** (confirmed 2026-09-15) |
 | Package | SOT-23-6 |
-| Datasheet | Optional — reference-circuit part |
+| Datasheet | `datasheet.pdf` (STMicroelectronics, 14 pages) |
 
-Two-channel ESD/TVS array on the USB D+/D− pair. Sits between the USB-C receptacle and the
-ESP32-C3's IO18/IO19.
+Two-channel ESD/TVS array on the USB D+/D− pair. Place it immediately behind the USB-C receptacle,
+before the two 22 Ohm series resistors and the ESP32-C3's IO18/IO19.
 
-Simple enough to copy from `../_reference/esp32-c3-devkitm-1_reference_schematic.pdf`. Listed here
-only so the BOM scanner sees it.
+| Pin | Connect to |
+|---:|---|
+| 1 and 6 | D− pass-through, connector side and MCU side |
+| 3 and 4 | D+ pass-through, connector side and MCU side |
+| 2 | GND with a short, low-inductance return |
+| 5 | USB VBUS |
+
+Copy the routing topology from the datasheet/reference schematic, but verify the chosen D+/D− pairing
+in the symbol. Keep connector-to-array traces short and avoid stubs.

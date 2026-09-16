@@ -1,4 +1,7 @@
-# MCP6002 — op-amp for the EDA / GSR front end
+# MCP6002 — archived v3 EDA/GSR research
+
+> **Not in the v2 BOM.** EDA/GSR was explicitly deferred to v3. This folder is retained only so the
+> research is not lost; no schematic agent should place this part on v2.
 
 | Field | Value |
 |---|---|
@@ -54,11 +57,10 @@ part choice.
 
 Output → one ESP32-C3 **ADC1** pin, read with oversampled `analogRead()`, gated on accelerometer
 motion ≈ 0. ADC1 channels are GPIO0–GPIO4; **GPIO2 is a strapping pin — do not use it.**
-GPIO3 (ADC1_CH3) is the clean choice.
+GPIO3 (ADC1_CH3) was the clean candidate during this research, but v2 now reserves it for battery
+sensing. A future v3 that restores EDA must assign and review a different ADC pin or redesign that
+allocation.
 
-## STATUS — this part is NOT approved
+## Status
 
-`CLAUDE.md` records the EDA front end as an **OPEN V1 decision the user has not made**, while this
-folder exists and `parts/README.md` still lists EDA under "NOT YET SELECTED". Three sources, three
-states. **Resolve before drawing the schematic** — adding EDA after a fab run is a full respin, and
-it is often the strongest single BAC predictor.
+Cut from v2 by user decision on 2026-09-15. Reconsider only in a separately scoped v3 design.

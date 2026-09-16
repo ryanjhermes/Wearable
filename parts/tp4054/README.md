@@ -3,42 +3,30 @@
 | Field | Value |
 |---|---|
 | Order code | TP4054-42-SOT25R |
-| LCSC | **C32574** (TOPPOWER). Alternates: C382138 (TPOWER), C5381776 (JSMSEMI) |
-| Package | **SOT-23-5** |
-| Input | 4–9 V (from USB-C VBUS) |
-| Charge current | Programmable, 450 mA max — **we use ~100 mA** |
-| Datasheet | `datasheet.pdf` (14pp) |
+| LCSC | **C32574** |
+| Package | SOT-23-5 |
+| Input | 4-9 V from USB VBUS |
+| Programmed current | 100 mA nominal with 10 kOhm 1% |
+| Datasheet | `datasheet.pdf` |
 
-Chosen over the TP4056 (C16581): that is ESOP-8 with a thermal pad and 1 A class — oversized and
-larger for a 250 mAh cell.
-
-## Charge current — the one calculation that matters
-
-From the datasheet: **I_BAT = 1000 V / R_PROG**
-
-| R_PROG | Charge current | C-rate on the 250 mAh cell |
-|---|---|---|
-| **10 kΩ** | **100 mA** | **0.4 C — use this** |
-| 8 kΩ | 125 mA | 0.5 C |
-| 2 kΩ | 500 mA | 2 C — **never** |
-
-**Use 10 kΩ.** It is a standard E24 value, gives a gentle 0.4 C, and charges the cell in ~3 h.
-The datasheet specifies a **1% resistor** — do not substitute a 5% part.
-
-Getting this wrong is a LiPo safety issue, not a performance one. This board has already had one
-reverse-polarity episode and one suspected charge-IC fault (`archive/v1/docs/hardware_debug_log.md`).
-
-## Schematic
+## Correct pinout
 
 | Pin | Name | Connect to |
-|---|---|---|
-| 1 | TEMP | Battery thermistor. **Tie to GND if unused** — do not float |
-| 2 | PROG | 10 kΩ 1% → GND |
-| 3 | GND | `GND` |
-| 4 | VCC | USB-C `VBUS` |
-| 5 | BAT | `VBAT` (cell +) |
+|---:|---|---|
+| 1 | CHRG | Leave open in v2; no status LED |
+| 2 | GND | GND |
+| 3 | BAT | BAT+ cell node and AO3401A drain |
+| 4 | VCC | USB VBUS; bypass locally |
+| 5 | PROG | 10 kOhm 1% to GND |
 
-Externals: 10 µF on VCC→GND, 10 µF on BAT→GND, 10 kΩ 1% on PROG→GND.
+There is **no TEMP pin** on this part. Earlier project notes that labeled pin 1 TEMP and shifted the
+remaining pins were wrong and would have produced a nonfunctional/unsafe footprint.
 
-No CHRG status LED — LEDs are cut from this design. Charge state is not externally visible; the
-battery sense divider on an ADC pin is the only indication.
+For charge current at or below 150 mA, the datasheet gives `RPROG = 1000 / IBAT`. Therefore 10 kOhm
+sets 0.1 A. Do not substitute 5% tolerance.
+
+Use the hardware load-sharing circuit in [`../V2_BOM.md`](../V2_BOM.md); the system must not attach
+directly to BAT. Place at least 1 uF at VCC; v2 uses 4.7 uF for margin. A BAT capacitor is omitted only
+if the battery is permanently connected. This charger has no cell-temperature input or safety timer,
+so its approved use is a protected cell in a supervised, off-wrist prototype, not unattended/on-body
+charging.

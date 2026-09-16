@@ -1,89 +1,69 @@
-# Support-circuitry decisions — why each part, and how confident
+# V2 support-circuit decisions
 
-Written for a future agent drawing the schematic. **Read this before substituting anything.**
+Read this with [`../V2_BOM.md`](../V2_BOM.md). The design priority is first-spin reliability with as
+few parts as practical, not the absolute minimum component count.
 
-The governing objective: **a v2 board that works on the first fab run.** That biases every choice
-below toward *widely-used parts with well-tested reference circuits*, not toward optimal parts.
-A boring part with ten thousand hobbyist boards behind it is lower-risk than a better part nobody
-has debugged.
+## Hardware load sharing is required
 
-## How these were selected — and the limits of that
+Connecting the system directly to the TP4054 BAT node would make charger current equal battery
+current plus system current. A running system can keep measured current above the C/10 termination
+threshold, preventing clean termination and lengthening charging.
 
-| What I did | What I did NOT do |
-|---|---|
-| Derived hard requirements from the sensor datasheets (rails, dropout, currents) | A systematic parametric search across all LCSC LDOs/chargers |
-| Picked parts that are ubiquitous in the LCSC/JLCPCB ecosystem, so reference circuits and footprints exist | Compare efficiency, noise, or thermal performance between candidates |
-| Verified pinouts against datasheets where a mistake would be silent (ME6211, TP4054) | Verify Basic-vs-Extended or live stock — JLCPCB renders these in JavaScript and they did not extract |
-| Chose smaller/simpler packages over higher-spec ones | Optimise for cost or for battery life |
+The approved solution follows Microchip AN1149's discrete topology:
 
-**Consequence: treat every row as "sound and conventional", not "provably optimal".** The one thing
-that must still be checked by a human is Basic/Extended + stock, in a live JLCPCB cart.
+- AO3401A P-MOSFET: drain BAT+, source VSYS, gate VBUS plus 100 kOhm to ground.
+- SS14: anode VBUS, cathode VSYS.
+- TP4054 BAT connects only to the cell/MOSFET drain node.
 
-## Per-part rationale
+When USB is present, USB powers VSYS and the cell charges independently. When USB is absent, the
+MOSFET connects the cell to VSYS with low loss. This also lets the device run and flash over USB.
 
-### 3.3 V LDO — ME6211C33M5G-N (C82942)
+The earlier firmware-deep-sleep-on-VBUS proposal is rejected. It did not isolate the charger from
+all possible system load, made charging correctness dependent on firmware, and prevented normal
+use/debugging while attached.
 
-The requirement is **dropout**, not current. A LiPo falls 4.2 → 3.0 V; an LDO cannot boost, so the
-regulator stops regulating once Vin < 3.3 V + dropout. At 120 mV this part holds regulation down to
-~3.42 V. A generic AMS1117 (1.1 V dropout) would need 4.4 V in and **would never regulate on a
-single LiPo at all** — a classic beginner failure.
+Primary reference: <https://ww1.microchip.com/downloads/en/appnotes/01149c.pdf>.
 
-500 mA is oversized for a ~70 mA load; that is deliberate headroom for the C3's ~350 mA TX peaks.
+## Two LDO rails are intentional
 
-⚠️ Do not substitute the **ME6211H** — the C and H series differ in enable polarity.
+- ME6211C33M5G-N makes 3.3 V for the MCU and ordinary sensors. Its low dropout preserves more of the
+  LiPo range than a 1117-class regulator, but regulation still ends around 3.42 V. A buck-boost was
+  rejected to save parts and switching-layout risk; firmware must sleep early.
+- XC6206P182MR makes 1.8 V only for MAX30101 VDD. The optical sensor's VDD absolute maximum is
+  2.2 V, so this rail cannot be removed.
 
-### 1.8 V LDO — XC6206P182MR (C21659)
+## Green PPG creates a real third regulated rail
 
-Exists solely because **MAX30101 VDD absolute max is 2.2 V** (datasheet-verified). Not a
-preference — 3.3 V destroys the sensor.
+MAX30101 has different LED supply requirements: 3.1-5.0 V for red/IR and 4.5-5.5 V for green. The
+previous claim that direct LiPo power covered green was incorrect. A 3.0-4.2 V cell cannot guarantee
+green operation.
 
-80 mA against a 20 mA load, and 1 µA quiescent current, which matters on a 250 mAh cell. Fed from
-**+3V3** rather than VBAT: less dropout stress, and the input is already filtered.
+Green is mandatory for v2, so use TPS61099DRVR with a 2.2 uH inductor, three 10 uF capacitors, and a
+1 MOhm/270 kOhm divider for about 4.704 V. That target sits in the overlap between the red/IR and
+green supply ranges. It is a small, low-quiescent-current converter whose
+datasheet explicitly lists optical heart-rate LED bias and wearable use. All seven parts are
+populated; a red/IR-only future revision could omit the entire block.
 
-### LiPo charger — TP4054 (C32574)
+Primary reference: <https://www.ti.com/lit/ds/symlink/tps61099.pdf>.
 
-Chosen over the far more common **TP4056 (C16581)** on size and current class: TP4056 is ESOP-8 with
-a thermal pad and targets 1 A, which is 4 C on a 250 mAh cell. TP4054 is SOT-23-5 and sets current
-with one resistor.
+## TP4054 is prototype-grade here
 
-**R_PROG = 10 kΩ 1% → 100 mA (0.4 C).** Datasheet equation `I = 1000/R_PROG`, verified.
+The TP4054 is compact and needs only a 10 kOhm program resistor for 100 mA nominal charge current.
+It does not provide a cell thermistor input or safety timer. It is acceptable only under the current
+requirement of a protected cell and supervised, off-wrist research-prototype charging. A product intended for
+unattended or on-body charging needs a charger/safety architecture review, not a drop-in substitution.
 
-### USB-C — TYPE-C-31-M-12 (C165948) + 2 × 5.1 kΩ + USBLC6-2SC6 (C7519)
+## Component savings deliberately taken
 
-Standard horizontal SMD, **not mid-mount**. Mid-mount needs a routed board cutout and was never
-sourced; it also solves a problem this board does not have, since the top side already stacks
-MINI-1 (2.4 mm) + LiPo (4.0 mm) = 6.4 mm and a 3.2 mm receptacle fits inside that envelope.
+- No LED, button, USB-UART bridge, auto-reset transistor pair, RTC, I2C level shifter, or power switch.
+- MAX30101 and TMP117 are polled, avoiding interrupt pull-ups.
+- The permanently soldered battery avoids a connector and allows omission of the
+  TP4054 BAT capacitor under the datasheet's battery-present condition.
+- One shared I2C pull-up pair serves all four sensors.
+- Test pads and DNP footprints are used where they add recovery options without populated BOM cost.
 
-The 5.1 kΩ CC resistors are not optional — without them a USB-C source supplies no power.
+## USB-C remains the bring-up and charging interface
 
-## DECISION REQUIRED — charge path
-
-**Problem.** The 3.3 V LDO input is `VBAT`, and there is no power switch, so with USB connected the
-charger refills the cell *while the system draws 50–70 mA from the same node*. Two consequences:
-
-1. **Termination never fires.** TP4054 terminates at ~1/10 of programmed current = 10 mA. System
-   draw keeps the node above that indefinitely, so the charger sits in CV holding 4.2 V forever.
-2. **Charging is very slow.** 100 mA charge − 60 mA load ≈ 40 mA into the cell → 6+ hours for
-   250 mAh.
-
-Given this project's history of thermal faults and one suspected charge-IC failure
-(`archive/v1/docs/hardware_debug_log.md`), a charger that never stops is a poor fit.
-
-### Options
-
-| | Approach | Parts | Risk |
-|---|---|---|---|
-| **A** | Do nothing | 0 | Slow charge, no termination, cell held at float. **Rejected** |
-| **B (recommended)** | **VBUS-sense divider → GPIO; firmware deep-sleeps while charging** | **2 resistors** | Deep sleep is ~5 µA, far below the 10 mA threshold, so termination works normally. Failure mode is *soft* — if firmware misbehaves you get option A back, recoverable by reflash, **not a respin** |
-| C | Discrete P-FET load-share | ~4 | Correct in hardware, but a discrete power-path arrangement is easy to get subtly backwards |
-| D | Integrated power-path charger — **BQ24074RGTR, LCSC C54313**, ~$1.19, in stock | 1 IC + ~5 | Most correct. But VQFN-16 with a thermal pad, three programming resistors (ISET/ILIM/TS), and a mis-wired QFN **is** a respin |
-
-### Recommendation: B
-
-Two resistors, and it is the only option whose failure mode is recoverable in firmware rather than
-in copper. It also gives the device something it wants anyway — knowledge of whether it is plugged
-in. **D (BQ24074, C54313) is the documented upgrade path** if a future revision wants power-path
-guaranteed in hardware.
-
-Note this couples to an open item: there is **no power switch**, so the device draws current
-whenever the battery is connected. Deep-sleep-on-charge does not fix standby drain in a drawer.
+Use a standard horizontal SMD receptacle, not mid-mount. The 3.2 mm connector fits within the
+top-side height already set by the 2.4 mm module plus 4.0 mm battery. Fit one 5.1 kOhm pull-down on
+each CC pin; without both resistors, a USB-C source is not required to supply VBUS.

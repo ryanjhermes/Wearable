@@ -13,9 +13,9 @@
 
 ## Layout note
 
-Measures its own die temperature, so it needs thermal coupling to skin (via stitch to an exposed
-pad) and thermal isolation from the ESP32 side. Treated as **optional insurance, not a requirement** —
-the self-heating hypothesis was never validated. See `CLAUDE.md`.
+Measures its own die temperature, so the PCB and enclosure need a deliberate thermal path to skin
+and isolation from the ESP32 side. A slot is **optional insurance, not a requirement** — the old
+self-heating hypothesis was never validated. See `CLAUDE.md`.
 
 Replaces the MLX90614, which was non-contact IR (wrong measurement), 4.1 mm tall, and is suspected dead.
 
@@ -29,7 +29,7 @@ Replaces the MLX90614, which was non-contact IR (wrong measurement), 4.1 mm tall
 | 4 | ADD0 | I | **Address select — must NOT float.** Tie to `GND` for 0x48 |
 | 5 | SDA | I/O | `SDA` |
 | 6 | V+ | P | `+3V3` |
-| — | Thermal pad | — | Solder to a `GND` copper pour — this is the thermal path to the die |
+| — | Thermal pad | — | For a rigid PCB, leave unsoldered for best accuracy. If soldered deliberately, leave floating or connect to `GND` |
 
 Address strapping (ADD0): `GND` → **0x48** · `V+` → 0x49 · `SDA` → 0x4A · `SCL` → 0x4B.
 Use **0x48**; no conflict with SHT40 (0x44), MAX30101 (0x57), LSM6DS3TR-C (0x6A/0x6B).
@@ -45,9 +45,13 @@ No other support parts. ~3.5 µA active — negligible against the 250 mAh budge
 
 ## Layout — this part's placement IS its calibration
 
-It reports **its own die temperature**, so the thermal path defines the measurement:
+It reports **its own die temperature**, so the thermal path defines the measurement. TI recommends
+leaving the thermal pad unsoldered on a rigid PCB for best accuracy: soldering reduces thermal
+resistance but adds package stress and can add measurement error. If the pad is deliberately
+soldered, it may be floating or grounded and the finished assembly needs calibration.
 
-- Thermal pad down to a copper pour that reaches a **skin-facing exposed pad**; vias stitch pad → pour.
+- Use a thin local PCB section and a skin-facing exposed copper area with a thermally conductive,
+  electrically insulating interface to the enclosure/skin. Keep board bending stress off the sensor.
 - Keep it away from the ESP32-C3-MINI-1 and both LDOs — they are the heat sources on this board.
 - A slot or copper relief between it and the MCU section is **optional cheap insurance, not a
   requirement** — the self-heating hypothesis was inferred from the MLX90614 behaviour and never
