@@ -598,7 +598,7 @@
 		(uuid "0a5be5ed-4476-4e3e-90cd-c0e3f2ae2d5a")
 	)
 	(embedded_fonts no)
-	(model "${KIPRJMOD}/pcb_v2.3dshapes/ESP32-C3-MINI-1.step"
+	(model "${KIPRJMOD}/pcb.3dshapes/ESP32-C3-MINI-1.step"
 		(offset
 			(xyz 0 0 0)
 		)

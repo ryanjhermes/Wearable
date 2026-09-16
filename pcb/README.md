@@ -1,4 +1,4 @@
-# pcb_v2 — Wearable V2 schematic
+# pcb — Wearable V2 schematic
 
 KiCad project for the custom ESP32-C3 fab PCB. Open `wearable_v2.kicad_pro` in KiCad 10.
 
@@ -17,8 +17,8 @@ never a basis for anything. This project starts from scratch.
 | `wearable_v2.kicad_sch` | **The schematic. Authoritative from the moment you open it.** |
 | `wearable_v2.kicad_pro` | Project file |
 | `symbols/wearable_v2.kicad_sym` | Project symbols: the five parts with no stock-library equivalent |
-| `pcb_v2.pretty/` | Project footprints — **all three now present and verified** |
-| `pcb_v2.3dshapes/` | STEP models for the module and inductor (needed later for enclosure fit) |
+| `pcb.pretty/` | Project footprints — **all three now present and verified** |
+| `pcb.3dshapes/` | STEP models for the module and inductor (needed later for enclosure fit) |
 | `bom_from_schematic.csv` | BOM generated from the schematic (51 populated parts) |
 | `build.py`, `schgen.py`, `libtool.py`, `sexp.py`, `mksym.py`, `gen_lib.py` | Bootstrap generator |
 
@@ -78,7 +78,7 @@ long drawn wires, so blocks can be moved without re-routing.
 
 ### ~~Three footprints must be created or imported~~ — DONE 2026-09-16
 
-All three now exist in `pcb_v2.pretty/` and the schematic resolves every footprint. ERC footprint
+All three now exist in `pcb.pretty/` and the schematic resolves every footprint. ERC footprint
 warnings went from 3 to 0.
 
 | Footprint | Source | Verified against |

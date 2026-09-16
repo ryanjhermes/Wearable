@@ -1,6 +1,6 @@
 import mksym as M
 
-P = '/Users/ryanhermes/Desktop/BIZTECH/Wearable/pcb_v2/symbols/wearable_v2.kicad_sym'
+P = '/Users/ryanhermes/Desktop/BIZTECH/Wearable/pcb/symbols/wearable_v2.kicad_sym'
 S = []
 
 # ---- ESP32-C3-MINI-1 (datasheet v2.2 Table 3-1) -----------------------------

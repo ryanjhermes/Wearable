@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Bootstrap generator for the Wearable V2 schematic.
 
-Emits pcb_v2/wearable_v2.kicad_sch from parts/V2_BOM.md. Run once; after the
+Emits pcb/wearable_v2.kicad_sch from parts/V2_BOM.md. Run once; after the
 schematic is opened and edited in KiCad the .kicad_sch is authoritative and
 this script must not be re-run over it.
 """
@@ -9,7 +9,7 @@ import os
 import schgen
 from schgen import Sch
 
-ROOT = "/Users/ryanhermes/Desktop/BIZTECH/Wearable/pcb_v2"
+ROOT = "/Users/ryanhermes/Desktop/BIZTECH/Wearable/pcb"
 schgen._load_local(os.path.join(ROOT, "symbols", "wearable_v2.kicad_sym"))
 
 sch = Sch("A2")
@@ -174,7 +174,7 @@ sch.text("only cell current and terminates. Body diode starts VSYS on battery.",
 
 # Battery: permanent solder pads, not populated by the assembler
 sch.place("Device:Battery_Cell", 285, 55, ref="BT1", value="LiPo 402030 250mAh",
-          footprint="pcb_v2:BatteryPads_2x", in_bom=False,
+          footprint="pcb:BatteryPads_2x", in_bom=False,
           extra_props=(("Note", "Hand-soldered pads; NOT assembled by JLCPCB"),))
 to_rail("BT1", "1", "BAT+", [(0, -5.08)])
 to_rail("BT1", "2", "GND", [(0, 5.08)])
@@ -236,7 +236,7 @@ to_rail("U6", "2", "4V7", [(7.62, 0), (0, -7.62)])
 to_rail("U6", "1", "GND", [(0, 5.08)])
 
 sch.place("Device:L", 480, 40, ref="L1", value="2.2uH 1.5A",
-          footprint="pcb_v2:L_MAKK2016T_2.0x1.6mm",
+          footprint="pcb:L_MAKK2016T_2.0x1.6mm",
           extra_props=(("LCSC", "C92923"),))
 to_rail("L1", "1", "VSYS", [(0, -2.54)])
 to_label("L1", "2", "SW_PPG", [(0, 2.54)])
@@ -264,7 +264,7 @@ sch.box(15, 140, 235, 295)
 title("E  ESP32-C3-MINI-1 (N4)", 18, 146)
 
 sch.place("wearable_v2:ESP32-C3-MINI-1", 110, 200, ref="U1",
-          value="ESP32-C3-MINI-1-N4", footprint="pcb_v2:ESP32-C3-MINI-1",
+          value="ESP32-C3-MINI-1-N4", footprint="pcb:ESP32-C3-MINI-1",
           extra_props=(("LCSC", "C2838502"),))
 to_rail("U1", "3", "3V3", [(-7.62, 0), (0, -5.08)])
 to_rail("U1", "1", "GND", [(0, 7.62)])

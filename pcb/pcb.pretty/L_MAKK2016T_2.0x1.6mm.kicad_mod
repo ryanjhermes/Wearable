@@ -246,7 +246,7 @@
 		(uuid "075e37a5-1109-4ea1-9afc-b7fbacec8934")
 	)
 	(embedded_fonts no)
-	(model "${KIPRJMOD}/pcb_v2.3dshapes/L_MAKK2016T_2.0x1.6mm.step"
+	(model "${KIPRJMOD}/pcb.3dshapes/L_MAKK2016T_2.0x1.6mm.step"
 		(offset
 			(xyz 0 0 0)
 		)

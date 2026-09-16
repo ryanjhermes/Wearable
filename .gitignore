@@ -13,3 +13,12 @@ data/*.png
 data/*.log
 !data/.gitkeep
 .mplconfig/
+
+# KiCad — per-user UI state and auto-backups, not design data
+*.kicad_prl
+*-backups/
+fp-info-cache
+*.kicad_pcb-bak
+*.kicad_sch-bak
+# VSCode "Local History" extension snapshots
+.history/

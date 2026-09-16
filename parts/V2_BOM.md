@@ -206,7 +206,7 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 
 ## Schematic capture status — first draft exists 2026-09-16
 
-A first schematic has been captured at [`../pcb_v2/`](../pcb_v2/) (KiCad 10). It is ERC-clean with
+A first schematic has been captured at [`../pcb/`](../pcb/) (KiCad 10). It is ERC-clean with
 0 errors, and its generated BOM reconciles exactly to the 51 populated components planned here,
 per-value quantities included. It is a first draft by a single author: no footprint audit, no
 independent electrical review, no power-budget check, no layout. Every gate below remains open.

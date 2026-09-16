@@ -13,7 +13,7 @@ readings are experimental.
 > once a schematic exists, its generated BOM owns reference designators and quantities.
 
 **V2 schematic status (2026-09-16): schematic CAPTURED and ERC-clean; freeze/order still not approved.**
-A KiCad project now exists at [`pcb_v2/`](pcb_v2/) (`wearable_v2.kicad_sch`, opens in KiCad 10.0.5
+A KiCad project now exists at [`pcb/`](pcb/) (`wearable_v2.kicad_sch`, opens in KiCad 10.0.5
 installed here). **ERC: 0 errors, 5 (understood) warnings; the generated BOM reconciles exactly to the
 planned 51 populated parts** and to `parts/V2_BOM.md`. Five symbols with no stock equivalent were
 hand-authored (ESP32-C3-MINI-1, MAX30101, TPS61099, TP4054, USBLC6-2SC6), pinouts checked against the
@@ -21,19 +21,27 @@ hand-authored (ESP32-C3-MINI-1, MAX30101, TPS61099, TP4054, USBLC6-2SC6), pinout
 killers): LSM6DS3TR-C ground ties were routed across the SDA/SCL stubs (would short the whole I2C bus
 to GND), and `BAT+` was two unconnected nets with the AO3401A gate on its own net not VBUS (cell never
 reaches the charger; load-share MOSFET stuck on). Screenshot-iterate workflow works: send a KiCad crop
-and the `.kicad_sch` gets patched. **`pcb_v2/build.py` is a one-shot bootstrap generator — once you
+and the `.kicad_sch` gets patched. **`pcb/build.py` is a one-shot bootstrap generator — once you
 edit in KiCad the `.kicad_sch` is the sole source of truth; do NOT re-run it or your edits are lost.**
 TPS61099 EN is `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD rises before VLED+.
 
 Two release gates are now RESOLVED: **offline-retention = summaries-only** (user decision), and the
 **module order code is forced to N4 (`C2838502`)** because N4X shows 0 stock at JLCPCB (see JLCPCB
 verification below). The **diagnostic LED was declined by the user**; 1V8 and 4V7 test pads replace it.
-Remaining before freeze/order: **footprint audit is still open (release gate #5)** — stock footprints
-were matched by package name only. Of the three that existed in NO library, **two were hand-authored
-this session (2026-09-16) into `pcb_v2/pcb_v2.pretty/`: `ESP32-C3-MINI-1.kicad_mod` and
-`L_MAKK2016T_2.0x1.6mm.kicad_mod`** (verify pad geometry/rotation against the datasheet + LCSC before
-trusting them); the **battery solder pads remain to be drawn.** Footprint generation was scripted
-(a `pads=0` bug produced a broken `L0806.kicad_mod` before the working inductor mod was created). Also still open: exact protected-battery evidence,
+**All three missing footprints are now created and assigned (2026-09-16); every one of the 51 symbols
+resolves to a footprint and ERC dropped from 5 warnings to 2** (both the benign LSM6DS3TR-C strap
+warnings). They live in `pcb/pcb.pretty/`: `ESP32-C3-MINI-1.kicad_mod` and
+`L_MAKK2016T_2.0x1.6mm.kicad_mod` were **imported from LCSC via `easyeda2kicad`** (installed in the
+project venv), NOT hand-authored; `BatteryPads_2x.kicad_mod` was hand-authored (two pads + 2 NPTH
+strain-relief holes). Two fixes applied post-import: the ESP32 import carried **no antenna keepout** —
+a labelled dashed rectangle now marks the 5.4 mm bare-antenna strip (of the module's 16.6 mm length only
+11.2 mm carries pads); and the inductor's **courtyard was smaller than its own pads** (EasyEDA bug) and
+was rebuilt to ±1.85 × ±1.15 mm. STEP models for the module and inductor were also copied into
+`pcb/pcb.3dshapes/`. **Verification status: only 2 of 51 footprints are datasheet-verified** — the
+ESP32 was checked pad-by-pad against Espressif Fig 11-1, but the **MAKK2016 inductor is UNVERIFIED (no
+datasheet on file)** and the other 48 are still package-name matches only, so **footprint audit
+(release gate #5) remains OPEN.** A new `parts/makk2016/` folder was created but has no datasheet — it is
+the project's only `check_parts.py` gap. Also still open: exact protected-battery evidence,
 independent electrical review, power-budget/thermal check, and the PCB layout itself.
 
 **JLCPCB single-supplier/assembler CONFIRMED (2026-09-16), queried against JLCPCB's own SMT assembly
@@ -371,12 +379,14 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
   air + be thermally isolated. `parts/check_parts.py` checks evidence integrity only; use schematic
   ERC and reconcile the generated BOM against `parts/V2_BOM.md`. `parts/_reference/` holds
   cross-cutting ESP32-C3 and battery load-sharing references.
-- `pcb_v2/` — **the v2 KiCad project (schematic captured 2026-09-16, untracked in git as of that date).**
+- `pcb/` — **the v2 KiCad project (schematic captured 2026-09-16, untracked in git as of that date).**
   `wearable_v2.kicad_sch/.kicad_pro` open in KiCad 10.0.5; ERC-clean, BOM reconciles to 51 parts and to
-  `parts/V2_BOM.md` (see the V2 schematic status at the top). `symbols/` + `pcb_v2.pretty/` hold the
+  `parts/V2_BOM.md` (see the V2 schematic status at the top). `symbols/` + `pcb.pretty/` hold the
   five hand-authored symbols; `build.py`/`schgen.py`/`mksym.py`/etc. are the **one-shot bootstrap
   generator — do NOT re-run after editing in KiCad** (`.kicad_sch` becomes the sole source of truth).
-  No PCB layout yet; three footprints still need LCSC import (see status). `README.md` documents it.
+  `pcb.pretty/` now holds all three project footprints (ESP32 + inductor imported from LCSC, battery
+  pads hand-authored) and `pcb.3dshapes/` the two STEP models. No PCB layout yet (next step is
+  Update-PCB-from-Schematic + floorplan). `README.md` documents it.
 - `enclosure/` — **v2 placeholder, intentionally empty of geometry.** Blocked on the fab PCB: the
   enclosure can't be dimensioned until the board outline is fixed. See `enclosure/README.md`. The
   v1 box moved to `archive/v1/enclosure/`.
