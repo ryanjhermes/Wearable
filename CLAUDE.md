@@ -12,6 +12,12 @@ readings are experimental.
 > candidate-BOM and power-path notes elsewhere in this file. Component folders contain evidence;
 > once a schematic exists, its generated BOM owns reference designators and quantities.
 
+**V2 schematic status (2026-09-16): capture approved, freeze/order not approved.** The circuit blocks,
+pinouts, primary parts, and support passives are defined well enough to draw the schematic. Remaining
+release gates are the exact protected battery evidence, offline-retention decision, exact N4 versus N4X
+module order code, symbol/footprint audit, ERC, power-budget review, and physical floorplan. TPS61099
+EN is now `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD rises before VLED+.
+
 **Status:** Phase 3 (sensor reads) is **COMPLETE**. MAX30102 heart rate and BMI160 motion both
 read live and are CONFIRMED simultaneously on the shared I2C bus. BLE HR streaming works
 untethered on battery. Battery power CONFIRMED working. Open work: enclosure — a first
@@ -74,7 +80,7 @@ includes historical evaluation context and must not override that file.
 | PPG / HR | MAX30102 (MH-ET LIVE breakout, ~20.5×15.5mm) | MAX30101 | Adds a **green** LED (red/IR is a fingertip/SpO₂ combo); wrist PPG in commercial devices is green | **MAX30101 CHOSEN for the fab board (user, 2026-09-15):** *"Let's go with the MAX30101 then, since a previous analysis said green is better for this use case."* This settles the sensor pick for the carrier PCB. **Caveat: the wrist-PPG wavelength test above STILL has not been run** — the choice rests on commercial practice, not a measurement. Because MAX30101 includes red, IR, and green, the test is now post-arrival validation rather than an ordering gate. **Fab track sourcing CONFIRMED (2026-09-14):** `MAX30101EFD+T` = LCSC **C2859066**, in stock ~319, Extended, ~$8.34@qty1 — the biggest BOM sourcing risk, now resolved |
 | Temp | MLX90614 GY-906 (suspected dead, tall TO-39 can) | TMP117AIDRVR | Contact temperature, low power, and <1 mm height | **SELECTED** — LCSC **C699536**, WSON-6 2.0×2.0×0.75 mm; evidence in `parts/tmp117/` |
 | IMU | BMI160 (GY-BMI160 breakout) | Keep BMI160 | Only needs to subtract activity from HR; existing driver works | **BMI160 confirmed DEAD on fab track (2026-09-14):** LCSC **C94021** is **consign-only, 0 stock** (the Bosch-EOL outcome) — not machine-placeable by JLCPCB. So on the fab track the accel is **LSM6DS3TR-C** (near-identical footprint; port ≈ axis-remap + register-address changes, ~a day of firmware). Keeping BMI160 only remains viable on the prototype/breakout track. User declined an upgrade to LIS2DH12 (2026-09-14) unless it's a large improvement. **LSM6DS3TR-C now sourced & filed (2026-09-15):** LCSC **C967633**, datasheet in `parts/lsm6ds3tr-c/`. It is **6-axis — the gyro is free**; use it for sway/tremor/gait-instability BAC features, not only activity-subtraction |
-| MCU | XIAO ESP32S3 (dev board) | ESP32-C3-MINI-1-N4 module | A dev board on a carrier = two stacked PCBs, violating the one-board constraint | **SELECTED** — LCSC **C2838502**, 4 MB flash; evidence in `parts/esp32-c3-mini-1/` |
+| MCU | XIAO ESP32S3 (dev board) | ESP32-C3-MINI-1 module | A dev board on a carrier = two stacked PCBs, violating the one-board constraint | **SELECTED FAMILY** — N4/LCSC **C2838502** is the stocked capture baseline; Espressif marks it NRND and recommends footprint-compatible N4X for new orders. Lock one exact order code before release; evidence in `parts/esp32-c3-mini-1/` |
 | Battery | LiPo 402030 (30×20×4, 250mAh) | unchanged for now | Pins the height budget | Owned |
 | EDA/GSR | none | analog front end | 4th Kaczor channel; see Application section | **CUT FROM V2 (user, 2026-09-15)** — "no EDA, maybe for v3... we'll need to get v2 working in the first place." Complexity reduction to maximise first-spin success. Costs the strongest single BAC predictor; revisit in v3. `parts/mcp6002/` kept as research, NOT on the BOM |
 | Ambient temp+humidity | none | SHT40-AD1B-R3 | De-confounds skin temperature; must be vented to ambient air | **SELECTED** — LCSC **C2848306**; evidence in `parts/sht40/` |
@@ -140,13 +146,14 @@ topology: AO3401A P-MOSF + SS14 Schottky + 100 kOhm gate pulldown. USB powers VS
 the TP4054 sees only battery current, so termination does not depend on firmware. Exact orientation
 and rationale are in `parts/V2_BOM.md` and `parts/_support/DECISIONS.md`.
 
-**Remaining pre-schematic evidence (2026-09-15):** identify the user's exact 250 mAh cell and verify
+**Remaining pre-freeze evidence (updated 2026-09-16):** identify the user's exact 250 mAh cell and verify
 its protection board, polarity, physical dimensions, and >=100 mA charge rating. Green PPG is
 mandatory, the cell is permanently soldered, and charging is supervised/off-wrist. All passives have
 exact MPNs and LCSC numbers. **No KiCad symbols/footprints exist yet** — `parts/` holds evidence only;
 every imported symbol and footprint must be checked against the manufacturer datasheet. Proposed
 fixed signals are SDA=GPIO6, SCL=GPIO7, and battery ADC=GPIO3. GPIO2/8/9 remain dedicated boot straps
-with 10 kOhm pull-ups.
+with 10 kOhm pull-ups. GPIO10 is assigned to `PPG_PWR_EN` with a 100 kOhm pulldown; firmware enables
+the boost only after the MAX30101 1.8 V logic rail is established.
 
 **No BOM generator was built, deliberately (assistant, 2026-09-15).** Quantities/refdes live in the
 schematic, not in `parts/`, so a `parts/`-reading script could only ever emit a parts *list* and would

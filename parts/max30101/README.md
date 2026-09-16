@@ -26,6 +26,8 @@ Verified from datasheet Absolute Maximum Ratings + Electrical Characteristics:
   LED's 4.5 V minimum.
 - V2 requires green, so VLED+ comes from the mandatory TPS61099 boost in `../V2_BOM.md`, set to
   approximately 4.704 V. A later design that omits the boost must be red/IR-only.
+- The datasheet recommends VDD before VLED+ at power-up. TPS61099 EN is therefore driven by GPIO10
+  (`PPG_PWR_EN`) with a 100 kOhm pulldown; firmware enables it only after the 1.8 V rail is established.
 - The green VLED range is guaranteed by the datasheet only at 25 C; validate green performance at
   actual skin and ambient temperatures.
 - SDA/SCL tolerate +6.0 V, so a **3.3 V I²C bus needs no level shifting** despite the 1.8 V VDD.
@@ -83,4 +85,4 @@ Rail budget from the same figure: **VDD +1.8 V @ 20 mA**, **VLED+ up to 200 mA p
 MAX30101 over MAX30102 is commercial-practice inference, not project data. The diagnostic
 (`archive/v1/src/max30102_raw_ir/` + `archive/v1/scripts/raw_ir_capture.py`) exists and has never
 been run. MAX30101 is still the selected sensor because it preserves red, IR, and green experiments
-in one footprint. The user made green mandatory on 2026-09-15, so the seven-part boost is approved.
+in one footprint. The user made green mandatory on 2026-09-15, so the eight-part boost is approved.

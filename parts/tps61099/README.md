@@ -19,7 +19,7 @@ for green, above a one-cell LiPo over its entire charge range.
 | 1 | GND | GND |
 | 2 | VOUT | 4V7_PPG and output capacitors |
 | 3 | FB | center of 1 MOhm / 270 kOhm divider |
-| 4 | EN | VSYS for always enabled, lowest-parts-count design |
+| 4 | EN | ESP32 GPIO10 `PPG_PWR_EN`; 100 kOhm pulldown to GND |
 | 5 | SW | 2.2 uH inductor output |
 | 6 | VIN | VSYS and input capacitor |
 | 7 / exposed pad | GND | solder to ground |
@@ -33,8 +33,19 @@ for green, above a one-cell LiPo over its entire charge range.
 | 2 | 10 uF, 10 V X5R | CL10A106KP8NNNC / C19702 | VOUT to GND |
 | 1 | 1 MOhm, 1% | 0402WGF1004TCE / C26083 | VOUT to FB |
 | 1 | 270 kOhm, 1% | 0402WGF2703TCE / C25770 | FB to GND |
+| 1 | 100 kOhm, 1% | 0402WGF1003TCE / C25741 | EN to GND; off during reset |
 
 The output is about 4.704 V. This target stays inside both MAX30101 VLED ranges: 3.1-5.0 V for
 red/IR and 4.5-5.5 V for green, including the TPS61099 feedback-reference tolerance. Account for
 ceramic-capacitor DC bias; two nominal 10 uF output parts provide margin. Keep the
 input-capacitor/inductor/SW loop compact and the feedback trace away from SW.
+
+MAX30101 recommends VDD before VLED+ at power-up. Firmware must keep `PPG_PWR_EN` low through reset,
+wait until the 1.8 V rail is established, and only then drive it high. The external pulldown makes the
+safe state independent of GPIO reset behavior. TPS61099 provides true output disconnection while
+disabled; never replace this connection with EN tied directly to VSYS.
+
+Taiyo Yuden renamed MAKK2016T2R2M to **LSANB2016KKT2R2M**, its mass-production preferred successor.
+Both are 2.2 uH, 0806/2016, 1.5 A rated/saturation-current class, and 0.16 Ohm maximum DCR. Keep C92923
+for the current capture baseline, but recheck the old number at order time and use the successor only
+after confirming its exact assembly identifier and footprint.

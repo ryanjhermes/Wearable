@@ -9,6 +9,10 @@ No schematic, routed PCB, verified footprint set, or completed mechanical model 
 checkout. Consequently this is a component/architecture review, not electrical or manufacturing
 sign-off. It cannot establish first-spin yield, wrist signal quality, runtime, or BAC prediction.
 
+Schematic capture is approved because the circuit blocks, interfaces, and mandatory support parts are
+defined. Freeze/order approval remains gated by the battery and retention decisions, exact module order
+code, symbol/footprint audit, ERC, power-budget review, and the physical floorplan.
+
 The most consequential unresolved requirements are offline raw-data duration and physical fit.
 The audit does not change the approved sensor scope or substitute parts. Existing working-tree
 changes were preserved. The observations below qualify several stronger claims in existing notes.
@@ -72,6 +76,11 @@ The converter has down mode and pass-through behavior; do not model it as an ide
 Check actual DC-bias capacitance of the selected ceramics and inductor saturation/current margin.
 Accept the rail only after bounding the relevant waveform at the sensor pins. This is an open
 margin issue, not proof that the converter must be replaced.
+
+The original always-on boost connection also violated the MAX30101's recommended power-up order
+(VDD before VLED+). The capture baseline now drives TPS61099 EN from GPIO10 with a 100 kOhm pulldown.
+This keeps VLED disconnected during reset and lets firmware enable it only after 1V8 is established.
+Verify that sequence and the VLED rise waveform during bring-up.
 
 Source: [TI TPS61099 datasheet](https://www.ti.com/lit/ds/symlink/tps61099.pdf), §§6.5, 7.3, 8.2.
 
@@ -150,10 +159,10 @@ required; ensure there is a way to recover after a low-battery sleep state when 
 | XC6206P182MR | Correct 1=GND, 2=VOUT, 3=VIN mapping; suitable in principle for the 1.8 V sensor rail from 3V3. |
 | TP4054 | Current notes have the correct CHRG/GND/BAT/VCC/PROG mapping and nominal 100 mA programming. Battery and thermal qualification remain open. |
 | AO3401A + SS14 | Drain-to-battery/source-to-VSYS MOSFET orientation and VBUS-to-VSYS diode implement the intended load share. Check transition behavior and low-USB/high-cell corners; correct topology alone does not prove all margins. |
-| TPS61099 + inductor/divider/caps | Correct general topology and DRV pin mapping. Resolve the rail-margin finding before treating it as guaranteed. |
+| TPS61099 + inductor/divider/caps | Correct general topology and DRV pin mapping. GPIO10 control plus an EN pulldown now enforces the recommended MAX30101 start-up order. Resolve the rail-margin finding before treating it as guaranteed. Taiyo Yuden renamed the selected inductor; recheck its successor at order time. |
 | TYPE-C-31-M-12 | Appropriate USB 2.0 connector concept; exact footprint, duplicated data/power pins, pegs and mating access need verification. |
 | USBLC6-2SC6 | Suitable protection class; route at connector, pin 5 to VBUS, short ground return, correct paired I/O pins. |
-| Listed resistors/capacitors | The planned 50-part arithmetic reconciles. Values are a design starting point, not proof of completeness. Check effective capacitance, stability, voltage/temperature ratings and layout; generated schematic BOM must own final counts. |
+| Listed resistors/capacitors | The planned 51-part arithmetic reconciles after adding the boost EN pulldown. Values are a design starting point, not proof of completeness. Check effective capacitance, stability, voltage/temperature ratings and layout; generated schematic BOM must own final counts. |
 
 The four sensor addresses (0x44, 0x48, 0x57, 0x6A) do not collide. One pull-up pair is appropriate;
 4.7 kOhm must still satisfy measured bus rise time at the selected speed. At 400 kHz a 300 ns
@@ -192,7 +201,7 @@ Sources: [MAX30101 datasheet](https://www.analog.com/media/en/technical-document
 A parts list is not a manufacturing package. Release needs a reviewed schematic, audited symbols
 and footprints, routed board with stackup, ERC/DRC disposition, Gerbers/drills, generated BOM,
 placement files, assembly drawings and handling instructions. Check exact stock and assembly
-eligibility in the actual order; those were not verified in this audit. Do not impose a 50-part
+eligibility in the actual order; those were not verified in this audit. Do not impose a 51-part
 ceiling if validation reveals necessary support parts.
 
 Agree separately who supplies/attaches the protected battery, adds strain relief, programs firmware,

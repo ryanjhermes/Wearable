@@ -1,5 +1,5 @@
 Enclosure work begins after the v2 fab-PCB outline and component placement are fixed. See
-[`../parts/V2_BOM.md`](../parts/V2_BOM.md) for the authoritative pre-schematic hardware plan.
+[`../parts/V2_BOM.md`](../parts/V2_BOM.md) for the authoritative capture-approved hardware plan.
 
 The enclosure is currently blocked by:
 

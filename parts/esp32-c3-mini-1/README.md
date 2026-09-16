@@ -1,4 +1,4 @@
-# ESP32-C3-MINI-1-N4 — MCU module
+# ESP32-C3-MINI-1 — MCU module family
 
 | Field | Value |
 |---|---|
@@ -9,6 +9,11 @@
 | Supply | 3.0–3.6 V |
 | Antenna | **Onboard PCB trace** (the `-1U` variant is U.FL instead) |
 | Datasheet | `datasheet.pdf` — **English v2.2, May 2026** |
+
+The selected N4 is a valid, currently sourceable prototype baseline, but Espressif marks it **NRND**.
+For a new order, prefer the footprint-compatible **ESP32-C3-MINI-1-N4X** (4 MB, chip revision v1.1)
+when assembly sourcing and the toolchain are confirmed. The schematic may use the shared family symbol
+and land pattern; its BOM must carry one exact, reviewed order code before release.
 
 ## Datasheet versions
 
@@ -44,6 +49,7 @@ Only the pins this design uses. Everything else is `NC` (pins 4, 7, 9, 10, 15, 1
 | 27 | IO19 | `USB_D+` through 22 Ohm series resistor |
 | 5 | IO2 | **Strapping pin** — 10 kΩ pull-up to `+3V3`; do not use for peripherals |
 | 6 | IO3 | `BAT_SENSE` from 1 MOhm / 1 MOhm divider; 100 nF to GND |
+| 16 | IO10 | `PPG_PWR_EN` to TPS61099 EN; 100 kOhm from EN to GND |
 | 20 | IO6 | Free — proposed `SDA` |
 | 21 | IO7 | Free — proposed `SCL` |
 | 30, 31 | RXD0 / TXD0 | UART0. Optional debug header; not needed (native USB) |
@@ -80,6 +86,7 @@ They cost nothing.
 | R_IO9 | 10 kΩ | IO9 → 3V3 | Normal boot; test pad can pull low for recovery |
 | R_USB_DM | 22 Ω | IO18 → USB D− | USB impedance/source damping; close to module |
 | R_USB_DP | 22 Ω | IO19 → USB D+ | USB impedance/source damping; close to module |
+| R_PPG_EN | 100 kΩ | IO10 / TPS61099 EN → GND | Keep VLED off during reset so MAX30101 VDD rises first |
 
 Copy the known-good arrangement from `../_reference/esp32-c3-devkitm-1_reference_schematic.pdf`.
 **Native USB (IO18/IO19) means no USB-UART bridge and no DTR/RTS auto-reset transistors** — a real

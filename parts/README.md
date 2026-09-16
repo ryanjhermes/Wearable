@@ -1,7 +1,7 @@
 # Parts evidence and v2 BOM
 
-Start with **[`V2_BOM.md`](V2_BOM.md)**. It is the authoritative pre-schematic list of approved
-parts, exact passives, power architecture, approval status, and unresolved evidence.
+Start with **[`V2_BOM.md`](V2_BOM.md)**. It is the authoritative capture-approved list of parts,
+exact passives, power architecture, approval status, and unresolved release gates.
 Then read **[`V2_HARDWARE_AUDIT.md`](V2_HARDWARE_AUDIT.md)** for the remaining system-level risks
 and validation gates.
 

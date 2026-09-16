@@ -1,9 +1,11 @@
 # V2 fab PCB — authoritative parts and power plan
 
-**Status:** pre-schematic review, updated 2026-09-16. This is the authoritative source for v2 part
-selection, required support circuitry, and unresolved hardware choices. Component folders hold the
-datasheet evidence. After a schematic exists, its generated BOM becomes authoritative for reference
-designators and quantities; this file remains authoritative for part rationale and approval status.
+**Status:** approved to begin schematic capture, updated 2026-09-16. This is the authoritative source
+for v2 part selection, required support circuitry, and unresolved hardware choices. It is **not**
+approval to freeze the schematic, route, or order boards; the release gates below still apply.
+Component folders hold the datasheet evidence. After a schematic exists, its generated BOM becomes
+authoritative for reference designators and quantities; this file remains authoritative for part
+rationale and approval status.
 
 Read [`V2_HARDWARE_AUDIT.md`](V2_HARDWARE_AUDIT.md) for the feasibility, power-margin, storage,
 mechanical, assembly, and bring-up risks that remain after part selection.
@@ -15,7 +17,8 @@ savings.
 ## Decisions already locked
 
 - One double-sided fab PCB; no stacked development board.
-- ESP32-C3-MINI-1-N4 module, native USB, and a standard horizontal USB-C receptacle.
+- ESP32-C3-MINI-1 module family, native USB, and a standard horizontal USB-C receptacle. The stocked
+  N4 is the capture baseline; N4X is Espressif's recommended, footprint-compatible order-time choice.
 - MAX30101, TMP117, LSM6DS3TR-C, and SHT40 sensors on one I2C bus.
 - No EDA/GSR, microphone, ECG, screen, status LED, RTC, USB-UART bridge, or user buttons in v2.
 - Hardware USB/battery load sharing using one P-channel MOSFET, one Schottky diode, and one gate
@@ -32,7 +35,7 @@ savings.
 
 ### Battery evidence
 
-The user owns several 250 mAh cells with pigtails. Before schematic sign-off, obtain a purchase link
+The user owns several 250 mAh cells with pigtails. Before schematic freeze, obtain a purchase link
 or clear photos of both faces, label, wire colors, connector, and any small protection PCB under the
 wrapper. Confirm polarity, dimensions including the protection-board bulge, built-in protection, and
 that the cell permits at least 100 mA charging (0.4 C). Do not assume connector polarity from wire
@@ -56,6 +59,8 @@ USB-C VBUS -----------------------------------------------------> TP4054 VCC
                               |                     +--> XC6206 1.8 V --> MAX30101 VDD
                               |
                               +--> TPS61099 4.7 V --> MAX30101 VLED+
+                                   EN <-- GPIO10 / PPG_PWR_EN
+                                         + 100 kOhm to GND
 
 TP4054 BAT --> BAT+ --> protected 1-cell LiPo
                  |
@@ -74,6 +79,11 @@ The ME6211 is an LDO, not a buck-boost regulator. It holds 3.3 V only while VSYS
 higher. This deliberate simplification leaves some cell capacity unused. Firmware should enter deep
 sleep around 3.45 V battery voltage, with calibrated threshold and hysteresis, rather than attempt to
 operate the MCU below its guaranteed supply range.
+
+The MAX30101 recommends VDD before VLED+ at power-up. GPIO10 therefore controls TPS61099 EN as
+`PPG_PWR_EN`; a 100 kOhm pulldown keeps the boost disabled during reset. Firmware must hold the net
+low through boot and enable it only after 1V8 is established. TPS61099 true shutdown disconnects its
+output, so this also removes the LED rail's idle load. Do not tie EN directly to VSYS.
 
 ## Mandatory populated parts — base design
 
@@ -96,7 +106,7 @@ change; the identifiers below were reviewed on 2026-09-15.
 | 1 | USB-to-system diode | SS14 | C2480 | SMA | Anode VBUS, cathode VSYS; stripe/cathode toward VSYS |
 
 The core PCB before the green supply block has **12 non-passives + 14 resistors + 17 capacitors = 43
-populated components**. Green is mandatory, so the complete planned v2 count is **50**, not counting
+populated components**. Green is mandatory, so the complete planned v2 count is **51**, not counting
 the battery or bare test pads. This count is a planning check, not a substitute for a BOM generated
 from the schematic.
 
@@ -137,25 +147,28 @@ Approved 4.7 V boost:
 | 1 | 2.2 uH inductor, 1.5 A saturation | Taiyo Yuden MAKK2016T2R2M | C92923 | 2.0 x 1.6 mm |
 | 1 | 1 MOhm, 1%, 0402, VOUT-to-FB | UNI-ROYAL 0402WGF1004TCE | C26083 | 0402 |
 | 1 | 270 kOhm, 1%, 0402, FB-to-GND | UNI-ROYAL 0402WGF2703TCE | C25770 | 0402 |
+| 1 | 100 kOhm, 1%, 0402, EN-to-GND | UNI-ROYAL 0402WGF1003TCE | C25741 | 0402 |
 | 3 | 10 uF, 10 V, X5R, 0603 | Samsung CL10A106KP8NNNC | C19702 | one input, two output |
 
 The divider gives approximately 4.704 V: `VOUT = 1 V x (1 MOhm + 270 kOhm) / 270 kOhm`. This sits
-inside the red/IR and green VLED ranges even with the converter's feedback-reference tolerance. Connect EN
-to VSYS for the lowest-parts-count implementation. Pinout is 1 GND, 2 VOUT, 3 FB, 4 EN, 5 SW,
-6 VIN, exposed pad GND. Keep the VIN capacitor/inductor/SW loop and VOUT capacitors extremely short.
+inside the red/IR and green VLED ranges under the published PWM feedback-reference limits, but rail
+margin still requires bench validation. Connect EN to GPIO10 (`PPG_PWR_EN`) and fit the listed
+100 kOhm pulldown. Pinout is 1 GND, 2 VOUT, 3 FB, 4 EN, 5 SW, 6 VIN, exposed pad GND. Keep the VIN
+capacitor/inductor/SW loop and VOUT capacitors extremely short.
 The MAX30101 still needs its local 4.7 uF + 100 nF VLED capacitors.
 
 The MAX30101 datasheet guarantees its 4.5-5.5 V green-LED supply range only at 25 C. The 4.704 V rail
 meets that published condition, but green performance over actual skin/ambient temperature must be
 validated on hardware; it is not a datasheet guarantee across the sensor's full temperature range.
 
-This block adds **7 populated components**, taking the planned PCB total from 43 to **50**. It is not
+This block adds **8 populated components**, taking the planned PCB total from 43 to **51**. It is not
 DNP or optional in v2. Removing it would be a later red/IR-only design change.
 
-## Required connections that add no BOM lines
+## Required schematic connections and test pads
 
 - Expose test pads for GND, 3V3, BAT+, VSYS, EN/RESET, GPIO9/BOOT, USB D-/D+, SDA, and SCL.
 - Pull GPIO2, GPIO8, and GPIO9 up with 10 kOhm. Do not hang sensors on strapping pins.
+- Use GPIO10 for `PPG_PWR_EN`; add the 100 kOhm EN pulldown and do not place it on a strapping pin.
 - Route GPIO9 and EN to accessible recovery pads. To force download mode: GPIO9 low while EN resets.
 - Put 22 Ohm resistors in series with D-/D+ close to the ESP32 module. Reserve optional DNP shunt-cap
   footprints only if routing space allows; do not populate without signal-integrity evidence.
@@ -180,20 +193,33 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 | 3.3 V buck-boost | Avoids several parts; accepted tradeoff is reduced usable battery capacity |
 | Battery connector | Omitted; the protected cell wires are permanently soldered to marked pads with strain relief |
 
-## Before schematic approval or ordering
+## Capture approval versus release approval
+
+Schematic capture may begin now. The component classes, primary order codes, pinouts, rail topology,
+I2C addresses, USB connections, boot straps, and mandatory support parts are sufficiently defined to
+draw and review the circuit. During capture, use the exact manufacturer pin numbering and create net
+labels for every rail and fixed GPIO assignment documented here.
+
+The schematic is **not** ready to freeze or order until all items below are closed. Layout must not
+start merely because a first schematic draft exists; first complete ERC and an independent pin/footprint
+review.
+
+## Before schematic freeze or ordering
 
 1. Verify the exact battery evidence listed above; green, permanent attachment, and supervised
    charging are already locked.
 2. Lock the offline data-retention requirement. If full raw sessions must survive without a phone,
    add storage before the schematic is frozen.
-3. Re-evaluate the NRND ESP32-C3-MINI-1-N4 ordering code against the recommended N4X/H4X successors;
-   do not accept a silent module substitution.
+3. Lock the exact module order code. Espressif recommends ESP32-C3-MINI-1-N4X (chip revision v1.1);
+   the existing N4 (revision v0.4) is NRND but remains a valid prototype fallback. The land pattern and
+   pinout are shared, but assembly availability, SDK support, and the chosen supplier ID must be checked
+   explicitly; do not accept a silent substitution.
 4. Draw and peer-check the load-share orientation, every regulator pinout, USB-C pin duplication,
    and every no-connect/thermal pad against the local PDFs.
 5. Import the exact LCSC symbol/footprint for every IC and connector, then compare pad numbers to the
    manufacturer datasheet. Never trust a symbol merely because its part number matches.
 6. Run ERC, generate the BOM from the schematic, and reconcile every line and quantity against this
-   document. The expected populated count is 50.
+   document. The current expected populated count is 51.
 7. Confirm current stock, assembly class, lifecycle, and price in the JLCPCB cart. Use exact order
    codes; do not allow “similar” substitutions for regulators, MOSFETs, or connectors.
 8. Have another electrical review before PCB layout, then review antenna, optical, thermal, USB, and

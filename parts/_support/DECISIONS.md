@@ -40,8 +40,9 @@ green operation.
 
 Green is mandatory for v2, so use TPS61099DRVR with a 2.2 uH inductor, three 10 uF capacitors, and a
 1 MOhm/270 kOhm divider for about 4.704 V. That target sits in the overlap between the red/IR and
-green supply ranges. It is a small, low-quiescent-current converter whose
-datasheet explicitly lists optical heart-rate LED bias and wearable use. All seven parts are
+green supply ranges. Drive EN from GPIO10 (`PPG_PWR_EN`) and fit a 100 kOhm pulldown so MAX30101 VDD
+rises before VLED+ as recommended. It is a small, low-quiescent-current converter whose datasheet
+explicitly lists optical heart-rate LED bias and wearable use. All eight parts are
 populated; a red/IR-only future revision could omit the entire block.
 
 Primary reference: <https://www.ti.com/lit/ds/symlink/tps61099.pdf>.
