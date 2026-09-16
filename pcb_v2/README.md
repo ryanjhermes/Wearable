@@ -2,8 +2,8 @@
 
 KiCad project for the custom ESP32-C3 fab PCB. Open `wearable_v2.kicad_pro` in KiCad 10.
 
-**Status: first schematic capture, 2026-09-16. ERC-clean (0 errors, 5 understood warnings).
-NOT frozen, NOT reviewed, NOT ready to order.** `parts/V2_BOM.md` remains authoritative for
+**Status: schematic captured and all footprints assigned, 2026-09-16. ERC-clean (0 errors,
+2 understood warnings). NOT frozen, NOT reviewed, NOT laid out, NOT ready to order.** `parts/V2_BOM.md` remains authoritative for
 part rationale and approval status; this schematic's generated BOM is now authoritative for
 reference designators and quantities.
 
@@ -62,9 +62,12 @@ long drawn wires, so blocks can be moved without re-routing.
 
 ## Verification NOT done — do not treat this as reviewed
 
-1. **No footprint audit.** Stock footprints were matched by package name only. BOM gate 5 requires
-   comparing every pad number against the manufacturer datasheet before layout. Nothing here
-   satisfies that.
+1. **Footprint audit is only 2 of 51 done.** The ESP32-C3-MINI-1 was checked pad by pad against
+   Espressif Figure 11-1, and `BatteryPads_2x` is hand-authored so its geometry is known. **The
+   other 48 stock-library footprints were matched by package name only**, and the MAKK2016
+   inductor has no manufacturer drawing at all. BOM gate 5 requires checking every one before
+   layout. Package-name matching is not that check: `SOT-23-5` and `SOT-23-6` parts in particular
+   share silhouettes while differing in pad count and pin order.
 2. **No independent electrical review.** One pass by one author is not the peer check the BOM
    requires before layout.
 3. **No power-budget or thermal check.** Audit findings 2 and 3 (ME6211 dropout margin, TPS61099
