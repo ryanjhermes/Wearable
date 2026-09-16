@@ -67,12 +67,12 @@ whole BOM; neither is answered:
 
 | Function | Currently owned | Candidate | Why considered | Status |
 |---|---|---|---|---|
-| PPG / HR | MAX30102 (MH-ET LIVE breakout, ~20.5×15.5mm) | MAX30101 | Adds a **green** LED (red/IR is a fingertip/SpO₂ combo); wrist PPG in commercial devices is green | **OPEN** — blocked on the wavelength test above; on the prototyping/Amazon track user leans to buying **another MAX30102 breakout** (small MAX30101 breakouts aren't available on Amazon, 2026-09-14). **Fab track sourcing CONFIRMED (2026-09-14):** `MAX30101EFD+T` = LCSC **C2859066**, in stock ~319, Extended, ~$8.34@qty1 — the biggest BOM sourcing risk, now resolved |
+| PPG / HR | MAX30102 (MH-ET LIVE breakout, ~20.5×15.5mm) | MAX30101 | Adds a **green** LED (red/IR is a fingertip/SpO₂ combo); wrist PPG in commercial devices is green | **MAX30101 CHOSEN for the fab board (user, 2026-09-15):** *"Let's go with the MAX30101 then, since a previous analysis said green is better for this use case."* This settles the sensor pick for the carrier PCB. **Caveat: the wrist-PPG wavelength test above STILL has not been run** — the choice rests on commercial practice, not a measurement, so run the raw-IR capture before committing money. (Prior OPEN framing: on the prototyping/Amazon track the fallback was **another MAX30102 breakout** — small MAX30101 breakouts aren't on Amazon, 2026-09-14 — now moot for the fab track.) **Fab track sourcing CONFIRMED (2026-09-14):** `MAX30101EFD+T` = LCSC **C2859066**, in stock ~319, Extended, ~$8.34@qty1 — the biggest BOM sourcing risk, now resolved |
 | Temp | MLX90614 GY-906 (suspected dead, tall TO-39 can) | TMP117 or MAX30205 | Contact temp beats non-contact IR for body temp; kills the tallest part | **OPEN** — TMP117 leads, not committed. Both <1mm tall (no height impact). Decider is power: TMP117 ~3.5µA active (WSON-6 2.0×2.0mm, ±0.1°C over −20…50°C); MAX30205 **~600µA active** (TDFN-8 3.0×3.0mm, ±0.1°C only in 37–39°C) — the 600µA matters on the 250mAh cell. **Fab stock (2026-09-14):** MAX30205 (C2917019/C476171) is **pre-order only, 0 stock**. **TMP117AIDRVR now sourced & filed (2026-09-15):** LCSC **C699536**, WSON-6 2.0×2.0×0.75mm, datasheet in `parts/tmp117/` |
 | IMU | BMI160 (GY-BMI160 breakout) | Keep BMI160 | Only needs to subtract activity from HR; existing driver works | **BMI160 confirmed DEAD on fab track (2026-09-14):** LCSC **C94021** is **consign-only, 0 stock** (the Bosch-EOL outcome) — not machine-placeable by JLCPCB. So on the fab track the accel is **LSM6DS3TR-C** (near-identical footprint; port ≈ axis-remap + register-address changes, ~a day of firmware). Keeping BMI160 only remains viable on the prototype/breakout track. User declined an upgrade to LIS2DH12 (2026-09-14) unless it's a large improvement. **LSM6DS3TR-C now sourced & filed (2026-09-15):** LCSC **C967633**, datasheet in `parts/lsm6ds3tr-c/`. It is **6-axis — the gyro is free**; use it for sway/tremor/gait-instability BAC features, not only activity-subtraction |
 | MCU | XIAO ESP32S3 (dev board) | ESP32-C3-MINI-1 (module) | A dev board on a carrier = two stacked PCBs, violating the one-board constraint | **OPEN** — see MCU note below. **`-N4` variant (4MB flash) now sourced & filed (2026-09-15):** LCSC **C2838502**, datasheet in `parts/esp32-c3-mini-1/` |
 | Battery | LiPo 402030 (30×20×4, 250mAh) | unchanged for now | Pins the height budget | Owned |
-| EDA/GSR | none | analog front end | 4th Kaczor channel; see Application section | **OPEN** |
+| EDA/GSR | none | analog front end | 4th Kaczor channel; see Application section | **CUT FROM V2 (user, 2026-09-15)** — "no EDA, maybe for v3... we'll need to get v2 working in the first place." Complexity reduction to maximise first-spin success. Costs the strongest single BAC predictor; revisit in v3. `parts/mcp6002/` kept as research, NOT on the BOM |
 | Ambient temp+humidity | none | SHT40-AD1B-R3 | **De-confounds skin temp/EDA** — a hot/humid room raises skin temp and sweat with no alcohol, corrupting the BAC signal; needed to regress out environment | **New candidate (2026-09-15), filed** — LCSC **C2848306**, ~2×2mm I2C, datasheet in `parts/sht40/`. User chose the R3 sub-variant; R2-vs-R3 question resolved to R3 (suffix = tape-and-reel qty only, electrically identical) |
 
 **Fab-track I2C bus has no address collisions (2026-09-15):** the four selected sensors sit at
@@ -106,10 +106,72 @@ decoupling caps (~8); mid-mount USB-C + 2× 5.1k CC resistors (mandatory or it w
 array (~4); EN pull-up + RC + BOOT/RESET access + decoupling (~6); the 2 I2C pull-ups above; EDA front
 end if included (~5). Most are Basic (no setup fee), but each is a chance to get something wrong. No
 RTC chip needed — the `#now` BLE clock-anchor + phone time already cover timestamps.
-**Support-part sourcing started, not finalized (2026-09-15):** first-pass candidates are
-**ME6211C33M5G-N** (3.3V LDO) and **USBLC6-2SC6** (USB ESD array) — "look right," not yet
-datasheet-verified or filed in `parts/`. The **mid-mount USB-C connector is still unpicked.** These
-do not close the support-part gap; the schematic stays blocked until they (and the rest) are chosen.
+**Support-part BOM now drafted & filed — `parts/_support/README.md` (2026-09-15).** A full candidate
+list (≈31 support parts, 5 ICs/connectors) with LCSC numbers, values, and net assignments: **3.3V LDO
+ME6211C33M5G-N (C82942)** — the 120mV dropout is the point, a generic AMS1117's ~1.1V would waste the
+bottom of the cell; **1.8V LDO XC6206P182MR (C21659)** for the MAX30101, fed from +3V3 not the battery
+(load ~20mA); **charger TP4054 (C32574)**, SOT-23-5, chosen over TP4056 (C16581, ESOP-8/1A-class,
+oversized for a 250mAh cell) — size the program resistor to ≤0.5C (~125mA); **USB-C TYPE-C-31-M-12
+(C165948)**; **ESD USBLC6-2SC6 (C7519)**. **Two parts the earlier list missed, both would break a first
+spin:** a **10kΩ pull-up on GPIO8** (strapping pin, defaults floating — module won't boot reliably
+without it, same category as the EN resistor) and a **battery-sense divider (2× 1MΩ)** for
+battery-percentage (the XIAO had one). **Caveat:** JLCPCB Basic-vs-Extended and stock render via JS and
+did NOT extract reliably — LCSC numbers are real and the parts exist, but confirm Basic/Extended in a
+JLCPCB cart before ordering (affects setup-fee cost, not feasibility). USBLC6 and MAX30101 are both
+**Extended**, so "mostly Basic" was optimistic.
+
+**Support parts now filed & sourcing-gated (2026-09-15).** The five support ICs/connectors each have a
+folder + datasheet: `parts/me6211/`, `parts/xc6206/`, `parts/tp4054/`, `parts/usb-c-16p/`,
+`parts/usblc6/`. Datasheet-verified pinouts/values (the class of detail that kills a first spin):
+- **ME6211C33M5G-N — CE (pin 3) MUST be tied high; floating = no output, no other symptom** (board
+  looks dead). Pinout `1=VIN, 2=VSS, 3=CE, 4=NC, 5=VOUT` (p.4). **Do NOT substitute the ME6211*H*** —
+  C and H series differ in enable *polarity*, same package/voltage.
+- **XC6206P182MR — pinout `1=VSS, 2=VIN, 3=VOUT`; ground is on pin 1**, not the usual SOT-23-3 spot.
+- **TP4054 — I_charge = 1000/R_PROG, so R_PROG = 10kΩ 1% → 100mA (0.4C)** — gentle on the 250mAh cell,
+  ~3h charge (supersedes the earlier "≤0.5C/~125mA" estimate).
+
+**Charge-path load-sharing is a real electrical GAP, not just a part choice (assistant, 2026-09-15) —
+the one addition worth breaking the simplicity goal for.** As drafted, the 3.3V LDO input sits on
+`VBAT` with no power switch, so on USB the TP4054 charges the cell *while* the system draws ~50–70mA
+from the same node. The TP4054 terminates at ~1/10 of the program current (~10mA at 100mA setting);
+with system load on that node **the threshold may never be reached → charging never cleanly terminates**
+and the cell is held at float. Fix: a **load-sharing P-FET + resistor (~2–3 parts)** so the system runs
+off VBUS when plugged in, leaving the charger to see only the battery. (A power switch is the
+alternative but means a hole in a sealed wristband.) Not yet designed in.
+
+**Remaining schematic-blockers beyond the charge path (2026-09-15):** (1) the **~22 passives still have
+NO LCSC part numbers** — JLCPCB assembly needs a real number for every R/C (all Basic, trivial, but not
+done); (2) **no KiCad symbols/footprints exist** — `parts/` holds datasheets only; KiCad is installed at
+`/Applications/KiCad` and `easyeda2kicad` can generate both from the LCSC numbers (why recording them
+first mattered), or EasyEDA's native LCSC integration removes this gap for a first board; (3) unmade
+decisions a schematic will force — **battery attach (solder pads vs JST), I2C pins (proposed
+SDA=GPIO6/SCL=GPIO7, unconfirmed), battery-sense ADC pin (GPIO0/1/3/4 — NOT GPIO2, strapping), power
+switch (interacts with the charge path).** Part *selection* is complete; these are what's left.
+
+**No BOM generator was built, deliberately (assistant, 2026-09-15).** Quantities/refdes live in the
+schematic, not in `parts/`, so a `parts/`-reading script could only ever emit a parts *list* and would
+become a second source of truth that disagrees with KiCad's netlist BOM. Sequencing is **schematic →
+KiCad BOM (authoritative, with quantities) → cross-check against `parts/`** for LCSC#/sourcing. What
+exists instead is **`parts/check_parts.py`** — a pre-order sourcing gate that checks each part folder
+for a valid `datasheet.pdf` (verifies the `%PDF` magic bytes — curl'd LCSC pages came back as HTML
+error pages, so this earns its keep), flags folders with no LCSC number, emits the paste-ready code
+list, and exits non-zero while gaps remain. **Caveat: it only scans folders, so its "No gaps" does NOT
+cover the passives-lack-LCSC-numbers gap above.**
+
+**Wavelength test no longer gates ordering — MAX30101 is a SUPERSET of the MAX30102 (2026-09-15):** it
+carries red (660nm), IR (880nm) *and* green (527nm) in the same package/`0x57`/library, so buying it
+doesn't commit to green — all three wavelengths are testable in firmware once the board arrives. This
+converts the undiagnosed wrist-PPG wavelength question from a **blocking pre-order risk into a
+post-arrival firmware experiment** (~$5 + Extended status is the whole cost of keeping the option open).
+
+**Mid-mount USB-C is UNNECESSARY — resolved (2026-09-15), reversing the note below.** A standard
+**~3.2mm horizontal SMD receptacle** fits *inside* the top-side height envelope already set by MINI-1
+(2.4mm) + LiPo (4.0mm) = 6.4mm, so it costs floorplan area at one board edge, not height. Mid-mount was
+solving a height problem this board doesn't have; the unsourced mid-mount part is dropped. **USB-C kept**
+(user called it "not essential," assistant argued to keep it): dropping the connector relocates the
+charger rather than removing it — external charging needs corrodible exposed contacts or a second
+dock to design, and loses single-cable flashing on a board reflashed constantly during bring-up. It's
+4 parts; keeping it is the lower-effort path to "works first try."
 
 **MCU — "ESP32-C3" names three different things:** the bare **chip** (QFN 5×5mm, needs crystal/
 antenna/flash support circuitry); the **ESP32-C3-MINI-1 module** (13.2×16.6×2.4mm — chip + flash +
@@ -120,10 +182,10 @@ Same silicon in all three. The MINI-1 is not an upgrade or a different family �
 can sit directly on a custom board. Cost of moving off the XIAO: you take on its USB-C, ESD, LDO,
 charger and boot/reset circuitry (~15 passives + 3 ICs of reference design).
 
-**USB-C:** keep it. Mid-mounted (connector dropped into a routed slot so its centerline sits at the
-board centerline) it stands **1.6mm above the PCB — below the 2.4mm MINI-1 module, so it costs zero
-height.** The pogo-pad/dock alternative buys ~55mm² of area, still needs the same charger IC, loses
-one-cable flashing, and adds a dock to design. Rejected on those grounds.
+**USB-C:** keep it — decision confirmed. **A standard horizontal SMD receptacle is used, NOT mid-mount**
+(see the mid-mount-is-unnecessary resolution above): at ~3.2mm it fits inside the top-side envelope, so
+it costs area at a board edge, not height. The pogo-pad/dock alternative buys ~55mm² of area, still needs
+the same charger IC, loses one-cable flashing, and adds a dock to design. Rejected on those grounds.
 
 **Antenna is a non-issue for this design (user, 2026-09-12):** data is stored on-device and BLE-synced
 to the phone on reconnect, so range/connection quality is not a priority.
@@ -142,14 +204,21 @@ missing channel is **EDA/GSR**.
 > component distributor that **JLCPCB** (PCB fab) pulls parts from when it assembles a board — it
 > matters only on the fab track, because the fab can only place parts LCSC stocks.
 
+**V2 BOM DECISION — EDA IS OUT (user, 2026-09-15).** Deferred to v3. The reasoning was explicitly
+about scope control, not merit: get a simpler board working first. Accept that the v2 dataset will
+have 3 of Kaczor's 4 channels (HR/HRV, skin temp, accelerometry) and no electrodermal channel, and
+that adding it later is a full respin. `parts/mcp6002/` stays as filed research.
+
 EDA is **analog, not I2C** — read as a voltage on an ADC pin via oversampled `analogRead()`, gated on
-BMI160 motion ≈ 0. **Open V1 decision (assistant recommends YES, user not yet decided):** whether to
+BMI160 motion ≈ 0. **ADC pin picked (2026-09-15): GPIO3 (ADC1_CH3)** — ADC1 spans GPIO0–GPIO4, but
+**GPIO2 is a strapping pin, do not use it**; GPIO3 is the clean channel (filed in `parts/mcp6002/`). **Open V1 decision (assistant recommends YES, user not yet decided):** whether to
 design EDA into the carrier PCB — it needs two skin electrodes + a small front end (op-amp, 2
 resistors, cap, 1 ADC pin, 2 gold skin pads); adding it after a fab run is a full board respin, and
 EDA is often the strongest single BAC predictor. **Fab constraint if EDA is included (2026-09-15):**
 the skin electrodes are **ENIG-plated pads on the board itself, not a purchased part** — the board
 must be ordered with an **ENIG (gold) finish; the default HASL (tin/lead) corrodes against sweat.**
-Candidate front-end op-amp filed in `parts/mcp6002/` (MCP6002T-I/SN; alts TLV9002 / OPA2333, LCSC# TBD)
+Candidate front-end op-amp filed in `parts/mcp6002/` (MCP6002-I/SN, SOIC-8, LCSC **C116706**;
+alt `MCP6002-E/SN` = C636235; Basic/Extended not yet confirmed; alts TLV9002 / OPA2333)
 — its existence does NOT change the status: EDA-in-V1 is still an OPEN, undecided call.
 
 **V1 sensor scope locked down (user, 2026-09-15):** "**We won't be doing microphone or ECG.**" Also
@@ -264,6 +333,8 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
   ESP32-C3-MINI-1 **GPIO8 needs an external 10kΩ pull-up or it won't boot**, and **native USB on IO18/19
   means no UART bridge and no auto-reset transistors** (a real parts saving); SHT40 must vent to outside
   air + be thermally isolated. Nothing in it is a decision — decisions live here.
+  `parts/check_parts.py` is a pre-order sourcing gate (datasheet `%PDF`-magic + LCSC# check, exits
+  non-zero on gaps) — folder-scan only, so it does NOT catch the passives that still lack LCSC numbers.
   `parts/_reference/` is NOT per-part datasheets — it holds three cross-cutting ESP32-C3 design docs
   (hardware design guidelines, DevKitM-1 reference schematic, C3 chip datasheet) to design the carrier
   schematic against.

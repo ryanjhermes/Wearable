@@ -2,6 +2,7 @@
 
 | Field | Value |
 |---|---|
+| Order code | LSM6DS3TR-C |
 | LCSC | **C967633** |
 | Manufacturer | STMicroelectronics |
 | Package | **LGA-14L, 2.5 × 3.0 × 0.83 mm** |

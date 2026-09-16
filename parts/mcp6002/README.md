@@ -3,9 +3,10 @@
 | Field | Value |
 |---|---|
 | Order code | **MCP6002T-I/SN** (`-I` = industrial temp grade, `/SN` = SOIC-8 narrow) |
-| LCSC | _TBD — look up and record_ |
+| LCSC | **C116706** (MCP6002-I/SN, SOIC-8). JLCPCB also lists `MCP6002-E/SN` = C636235. Checked 2026-09-15 — **Basic/Extended not confirmed** |
 | Manufacturer | Microchip |
 | Channels | Dual (one for EDA, one spare) |
+| Package | **SOIC-8, 1.75 mm tall** — MSOP-8 (1.1 mm) is not stocked at JLCPCB. Mount **top side**, where the 2.4 mm module sets the height, so this costs nothing |
 | Datasheet | `datasheet.pdf` |
 
 > **Folder-naming note:** the order code contains a `/`, which the filesystem reads as a directory

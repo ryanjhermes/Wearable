@@ -26,7 +26,7 @@ Requires `poppler` (`brew install poppler`) for PDFs to be machine-readable. Alr
 
 No address conflicts. **Only the MAX30101 needs a non-3.3 V rail.**
 
-`mcp6002/` also exists on disk (EDA front end) but is **not approved** — see the EDA row below.
+`mcp6002/` also exists on disk (EDA front end) but is **CUT FROM V2** — deferred to v3.
 
 ## Power tree
 
@@ -82,17 +82,24 @@ Blocks still needing LCSC part numbers before a schematic can be built:
 | 1.8 V LDO | 1 IC + 2 caps | Load is only ~20 mA, so an 80 mA part is ample. `XC6206P182MR` class. Feed from `+3V3` |
 | LiPo charger | 1 IC + program resistor + caps | MCP73831 / TP4054 class. Program resistor sets charge current — size it to ≤0.5 C of the 250 mAh cell |
 | USB-C | Receptacle + **2 × 5.1 kΩ CC resistors** + ESD array | The CC resistors are mandatory: without them a USB-C source delivers no power at all. `USBLC6-2SC6` (LCSC C7519, **Extended**) for ESD. **Mid-mount part not yet identified** — the common right-angle parts are not mid-mount |
-| EDA front end | Op-amp + R/C network | See `mcp6002/` — **decision not made** |
+| ~~EDA front end~~ | ~~Op-amp + R/C network~~ | **CUT FROM V2 (user, 2026-09-15)** — deferred to v3. `mcp6002/` kept as research, not on the BOM |
 | Passives | ~8 decoupling caps, 2 × 4.7 kΩ I²C pull-ups, EN RC, IO8 pull-up | Per-part values are in each folder's "required externals" table |
 
 Rough count: **~25–30 support parts.** Most are JLCPCB Basic with no setup fee, but each is a chance
 to get something wrong. No RTC needed — the `#now` BLE clock anchor plus phone time covers timestamps.
 
 **Open before a schematic can be drawn:**
-1. **EDA in or out?** Adding it after a fab run is a full respin.
-2. **Mid-mount USB-C part number.** The height claim (1.6 mm, below the module) depends on a genuine
-   mid-mount receptacle, which needs a board cutout. Not yet sourced.
-3. **Wrist PPG wavelength** — gates MAX30101 vs MAX30102, the largest BOM line.
+1. ~~EDA in or out?~~ **RESOLVED 2026-09-15 — out for v2.**
+2. ~~Mid-mount USB-C.~~ **RESOLVED 2026-09-15 — mid-mount not needed.** The top side already stacks
+   MINI-1 (2.4 mm) + LiPo (4.0 mm) = 6.4 mm, so a standard 3.2 mm horizontal SMD receptacle fits
+   inside that envelope and adds zero total height. Mid-mount was solving a problem this board
+   does not have.
+3. **Wrist PPG wavelength** — gates MAX30101 vs MAX30102, the largest BOM line. Still open.
+
+## Support circuitry
+
+`_support/` — the LDOs, charger, USB-C and passives the XIAO and breakouts were providing.
+`_support/DECISIONS.md` records why each was chosen and what is still open.
 
 ## Ruled out
 
