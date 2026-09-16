@@ -12,11 +12,38 @@ readings are experimental.
 > candidate-BOM and power-path notes elsewhere in this file. Component folders contain evidence;
 > once a schematic exists, its generated BOM owns reference designators and quantities.
 
-**V2 schematic status (2026-09-16): capture approved, freeze/order not approved.** The circuit blocks,
-pinouts, primary parts, and support passives are defined well enough to draw the schematic. Remaining
-release gates are the exact protected battery evidence, offline-retention decision, exact N4 versus N4X
-module order code, symbol/footprint audit, ERC, power-budget review, and physical floorplan. TPS61099
-EN is now `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD rises before VLED+.
+**V2 schematic status (2026-09-16): schematic CAPTURED and ERC-clean; freeze/order still not approved.**
+A KiCad project now exists at [`pcb_v2/`](pcb_v2/) (`wearable_v2.kicad_sch`, opens in KiCad 10.0.5
+installed here). **ERC: 0 errors, 5 (understood) warnings; the generated BOM reconciles exactly to the
+planned 51 populated parts** and to `parts/V2_BOM.md`. Five symbols with no stock equivalent were
+hand-authored (ESP32-C3-MINI-1, MAX30101, TPS61099, TP4054, USBLC6-2SC6), pinouts checked against the
+`parts/` datasheets. **Two real defects caught and fixed during capture** (both silent first-spin
+killers): LSM6DS3TR-C ground ties were routed across the SDA/SCL stubs (would short the whole I2C bus
+to GND), and `BAT+` was two unconnected nets with the AO3401A gate on its own net not VBUS (cell never
+reaches the charger; load-share MOSFET stuck on). Screenshot-iterate workflow works: send a KiCad crop
+and the `.kicad_sch` gets patched. **`pcb_v2/build.py` is a one-shot bootstrap generator — once you
+edit in KiCad the `.kicad_sch` is the sole source of truth; do NOT re-run it or your edits are lost.**
+TPS61099 EN is `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD rises before VLED+.
+
+Two release gates are now RESOLVED: **offline-retention = summaries-only** (user decision), and the
+**module order code is forced to N4 (`C2838502`)** because N4X shows 0 stock at JLCPCB (see JLCPCB
+verification below). The **diagnostic LED was declined by the user**; 1V8 and 4V7 test pads replace it.
+Remaining before freeze/order: **footprint audit is still open (release gate #5)** — stock footprints
+were matched by package name only. Of the three that existed in NO library, **two were hand-authored
+this session (2026-09-16) into `pcb_v2/pcb_v2.pretty/`: `ESP32-C3-MINI-1.kicad_mod` and
+`L_MAKK2016T_2.0x1.6mm.kicad_mod`** (verify pad geometry/rotation against the datasheet + LCSC before
+trusting them); the **battery solder pads remain to be drawn.** Footprint generation was scripted
+(a `pads=0` bug produced a broken `L0806.kicad_mod` before the working inductor mod was created). Also still open: exact protected-battery evidence,
+independent electrical review, power-budget/thermal check, and the PCB layout itself.
+
+**JLCPCB single-supplier/assembler CONFIRMED (2026-09-16), queried against JLCPCB's own SMT assembly
+API (not LCSC):** all 25 BOM line items are in JLCPCB's assembly library, every one `source: shop`
+(JLCPCB holds the stock — no consignment) with non-zero stock. **13 Extended part types + 12 Basic**
+→ ~$3/unique-Extended-type loading fee ≈ $39 one-time (the dominant NRE on a small run; confirm in
+cart). The board's **single supply risk is the MAX30101 (`C2859066`): ~304 stock, ~10× below every
+other line, $8.34** — fine for a 5-board spin, not for a months-later reorder. `C25770` (270k 0402 1%)
+is the only Extended *passive* (no Basic equivalent; keep it). The two-sided form factor forces a
+second SMT setup (quote both sides); the **battery is hand-soldered by you, not in the JLCPCB shipment.**
 
 **Status:** Phase 3 (sensor reads) is **COMPLETE**. MAX30102 heart rate and BMI160 motion both
 read live and are CONFIRMED simultaneously on the shared I2C bus. BLE HR streaming works
@@ -52,6 +79,20 @@ recoverable from commit `ebf99dc` if ever needed. The new board starts from scra
 - **Antenna keepout vs battery:** if an ESP32-C3-MINI-1 is used, the LiPo's metal pouch must NOT sit
   over the module's PCB trace antenna — it detunes/blocks it. Battery goes over the opposite end;
   the antenna end needs clear copper and no metal above it.
+- **Component-area audit from the captured schematic (2026-09-16):** summing every footprint's KiCad
+  courtyard, all 51 populated parts = **550 mm²** total → **~23×23 mm per side** two-sided at realistic
+  packing. The ESP32-C3-MINI-1 alone is 219 mm² (**40%**), USB-C 100 mm² (18%), all 37 passives only
+  78 mm² (14%). **The 402030 battery (30×20 = 600 mm², on top) is larger than all the electronics
+  combined** — so shrinking the circuit barely shrinks the board; the **cell (and its runtime) is the
+  binding size constraint**, and deleting every passive would save just 14%. This makes the ~32×24 mm
+  target tight: whether the battery and the module antenna can coexist inside 32×24 has **never been
+  checked** — that verification needs a floorplan (the 3 missing footprints imported, big items placed,
+  no routing; ~a day, not started). The three size levers are smaller battery (biggest win, costs
+  runtime), drop USB-C (100 mm² + 4 parts, already rejected), or bare ESP32-C3 chip (~120 mm², high
+  first-spin risk). **User relaxed the size target (2026-09-16): a 30×20 mm (3×2 cm, i.e. the 402030)
+  cell "is totally fine" because "most consumer wearable sizes are dominated by the battery anyway"** —
+  so the smaller-battery lever is CLOSED and the ~32×24 mm Whoop-class goal is no longer a hard target;
+  plan for a battery-dominated footprint sized around the 30×20 cell rather than shrinking under it.
 - **Optical isolation deprioritized (user's call).** Not being designed as a PCB-level feature. The
   cheap fallback if wrist PPG is weak: an opaque ring printed into the enclosure between LED and
   photodiode, and no air gap to skin — costs nothing at the PCB level, so this stays reversible.
@@ -330,6 +371,12 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
   air + be thermally isolated. `parts/check_parts.py` checks evidence integrity only; use schematic
   ERC and reconcile the generated BOM against `parts/V2_BOM.md`. `parts/_reference/` holds
   cross-cutting ESP32-C3 and battery load-sharing references.
+- `pcb_v2/` — **the v2 KiCad project (schematic captured 2026-09-16, untracked in git as of that date).**
+  `wearable_v2.kicad_sch/.kicad_pro` open in KiCad 10.0.5; ERC-clean, BOM reconciles to 51 parts and to
+  `parts/V2_BOM.md` (see the V2 schematic status at the top). `symbols/` + `pcb_v2.pretty/` hold the
+  five hand-authored symbols; `build.py`/`schgen.py`/`mksym.py`/etc. are the **one-shot bootstrap
+  generator — do NOT re-run after editing in KiCad** (`.kicad_sch` becomes the sole source of truth).
+  No PCB layout yet; three footprints still need LCSC import (see status). `README.md` documents it.
 - `enclosure/` — **v2 placeholder, intentionally empty of geometry.** Blocked on the fab PCB: the
   enclosure can't be dimensioned until the board outline is fixed. See `enclosure/README.md`. The
   v1 box moved to `archive/v1/enclosure/`.

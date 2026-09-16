@@ -33,6 +33,9 @@ savings.
 
 ## Remaining user inputs before schematic freeze
 
+Only the battery evidence below is still open. Retention, the module order code, and the
+debug-LED question were all closed on 2026-09-16 (see the JLCPCB verification section).
+
 ### Battery evidence
 
 The user owns several 250 mAh cells with pigtails. Before schematic freeze, obtain a purchase link
@@ -41,13 +44,14 @@ wrapper. Confirm polarity, dimensions including the protection-board bulge, buil
 that the cell permits at least 100 mA charging (0.4 C). Do not assume connector polarity from wire
 color alone; small LiPo pigtails are not universally wired the same way.
 
-### Offline data-retention requirement
+### Offline data-retention requirement — RESOLVED 2026-09-16
 
-Decide what must survive when the phone is absent: per-second summaries, a limited raw-data window,
-or a full raw session. The N4 module has 4 MB shared by firmware and logs. The audit's illustrative
-three-wavelength PPG plus six-axis motion stream is about 5.4 MB/hour before timestamps and file
-overhead, so multi-hour raw logging cannot fit in internal flash. Full-session raw capture requires
-external storage or a different acquisition workflow; summaries can fit without changing hardware.
+**Decision (user): no external storage in v2. Log per-second summaries to internal flash only.**
+A 32-byte summary each second is about 691 kB over six hours and fits the N4's 4 MB alongside
+firmware. Full-session raw PPG/motion capture is therefore only possible while the phone is
+connected and streaming. External QSPI flash and a microSD socket were both considered and
+rejected: the former costs four GPIO on an already-constrained C3, the latter breaks the
+32 x 24 mm envelope. Adding raw-session capture later is a board revision.
 
 ## Power tree
 
@@ -87,8 +91,11 @@ output, so this also removes the LED rail's idle load. Do not tie EN directly to
 
 ## Mandatory populated parts — base design
 
-Order-time availability and JLCPCB Basic/Extended status must be rechecked. Distributor state can
-change; the identifiers below were reviewed on 2026-09-15.
+**JLCPCB assembly availability VERIFIED 2026-09-16** against JLCPCB's own SMT parts API (not LCSC):
+all 25 BOM line items are in the assembly library, all `source: shop` (JLCPCB-stocked, not consign),
+all with non-zero stock. 13 Extended types, 12 Basic. See the verification section at the end of this
+file for the recorded stock and library class. Distributor state still changes; recheck in the cart
+at order time.
 
 | Qty | Function | Approved part | LCSC | Package | Critical note |
 |---:|---|---|---|---|---|
@@ -166,7 +173,10 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 
 ## Required schematic connections and test pads
 
-- Expose test pads for GND, 3V3, BAT+, VSYS, EN/RESET, GPIO9/BOOT, USB D-/D+, SDA, and SCL.
+- Expose test pads for GND, 3V3, **1V8**, **4V7 (VLED+)**, BAT+, VSYS, EN/RESET, GPIO9/BOOT,
+  USB D-/D+, SDA, and SCL. The 1V8 and 4V7 pads were added 2026-09-16 when the debug LED was
+  declined: they are the two hardest rails to verify and the two most likely to be wrong on a first
+  spin, and with no LED the only bring-up diagnostics are native-USB serial, these pads, and BLE.
 - Pull GPIO2, GPIO8, and GPIO9 up with 10 kOhm. Do not hang sensors on strapping pins.
 - Use GPIO10 for `PPG_PWR_EN`; add the 100 kOhm EN pulldown and do not place it on a strapping pin.
 - Route GPIO9 and EN to accessible recovery pads. To force download mode: GPIO9 low while EN resets.
@@ -188,10 +198,33 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 | USB-UART bridge and auto-reset transistors | ESP32-C3 has native USB |
 | RTC | Phone/BLE time anchor covers timestamps |
 | I2C level shifter | MAX30101 SDA/SCL tolerate the 3.3 V bus |
-| LEDs and buttons | Explicitly cut; recovery uses test pads |
+| LEDs and buttons | Explicitly cut. Re-confirmed 2026-09-16: a DNP 0402 LED footprint was offered and **declined** by the user. Bring-up visibility comes from native-USB serial (the C3 enumerates whenever the chip runs, no UART bridge), the rail test pads including the new 1V8/4V7, and BLE data reaching the iOS app. Note what BLE data does **not** validate: 4V7 rail margin, TMP117 skin accuracy, SHT40 venting, or charge termination |
+| External QSPI flash / microSD | Declined 2026-09-16 with the summaries-only retention decision |
 | Power switch | Omitted for space and sealing; use deep sleep |
 | 3.3 V buck-boost | Avoids several parts; accepted tradeoff is reduced usable battery capacity |
 | Battery connector | Omitted; the protected cell wires are permanently soldered to marked pads with strain relief |
+
+## Schematic capture status — first draft exists 2026-09-16
+
+A first schematic has been captured at [`../pcb_v2/`](../pcb_v2/) (KiCad 10). It is ERC-clean with
+0 errors, and its generated BOM reconciles exactly to the 51 populated components planned here,
+per-value quantities included. It is a first draft by a single author: no footprint audit, no
+independent electrical review, no power-budget check, no layout. Every gate below remains open.
+
+Two real defects were caught during capture and are worth recording because both would have killed
+a first spin silently: the IMU ground ties shorted the I2C bus to ground, and `BAT+` existed as two
+unconnected nets so the cell never reached the charger while the load-share gate floated off VBUS.
+
+**Footprints complete 2026-09-16.** The three parts with no stock-library footprint were resolved:
+the ESP32-C3-MINI-1 and MAKK2016T2R2M were imported from LCSC with `easyeda2kicad`, and the battery
+solder pads were hand-authored. Every schematic symbol now resolves to a footprint and ERC reports
+0 errors with 2 understood warnings. The module footprint was checked pad by pad against Espressif
+Figure 11-1 and its 5.4 mm antenna keepout is now marked in the footprint itself. The inductor
+footprint carried a courtyard smaller than its own pads, which was rebuilt.
+
+**One evidence gap opened by this work:** MAKK2016T2R2M had no `parts/` folder at all. One now
+exists at [`makk2016/`](makk2016/) but **has no manufacturer datasheet**, so its footprint, current
+rating and DCR are unverified. `check_parts.py` reports this as the project's only gap.
 
 ## Capture approval versus release approval
 
@@ -210,10 +243,11 @@ review.
    charging are already locked.
 2. Lock the offline data-retention requirement. If full raw sessions must survive without a phone,
    add storage before the schematic is frozen.
-3. Lock the exact module order code. Espressif recommends ESP32-C3-MINI-1-N4X (chip revision v1.1);
-   the existing N4 (revision v0.4) is NRND but remains a valid prototype fallback. The land pattern and
-   pinout are shared, but assembly availability, SDK support, and the chosen supplier ID must be checked
-   explicitly; do not accept a silent substitution.
+3. ~~Lock the exact module order code.~~ **CLOSED 2026-09-16: ESP32-C3-MINI-1-N4 (C2838502).**
+   Espressif recommends N4X, but JLCPCB lists N4X (C9900263492) at **0 stock** while N4 shows 16,000
+   in stock. N4 is therefore the only machine-placeable option at this assembler. It is NRND, not
+   discontinued, and remains valid for a prototype spin. If a future spin needs N4X, the land pattern
+   is identical but assembly sourcing must be rechecked and chip revision v1.1 SDK support confirmed.
 4. Draw and peer-check the load-share orientation, every regulator pinout, USB-C pin duplication,
    and every no-connect/thermal pad against the local PDFs.
 5. Import the exact LCSC symbol/footprint for every IC and connector, then compare pad numbers to the
@@ -235,3 +269,46 @@ review.
   external values, and layout. <https://www.ti.com/lit/ds/symlink/tps61099.pdf>
 - Espressif, ESP32-C3 hardware design guidelines: local copy in
   [`_reference/esp32-c3_hardware_design_guidelines_en.pdf`](_reference/esp32-c3_hardware_design_guidelines_en.pdf).
+
+## JLCPCB assembly availability — verified 2026-09-16
+
+Queried JLCPCB's SMT assembly parts API directly. Every line is `source: shop`, meaning JLCPCB holds
+the stock for assembly rather than requiring consignment. **All 25 line items are assemblable in one
+JLCPCB fab + assembly order.**
+
+| LCSC | Part | Library | Stock | $/1 |
+|---|---|---|---:|---:|
+| C2838502 | ESP32-C3-MINI-1-N4 | Extended | 16,000 | 3.84 |
+| C2859066 | MAX30101EFD+T | Extended | 304 | 8.34 |
+| C699536 | TMP117AIDRVR | Extended | 8,441 | 1.01 |
+| C967633 | LSM6DS3TR-C | Extended | 25,216 | 1.52 |
+| C2848306 | SHT40-AD1B-R3 | Extended | 10,878 | 1.75 |
+| C82942 | ME6211C33M5G-N | Extended | 245,159 | 0.06 |
+| C21659 | XC6206P182MR | Extended | 40,037 | 0.16 |
+| C32574 | TP4054-42-SOT25R | Extended | 30,267 | 0.13 |
+| C7519 | USBLC6-2SC6 | Extended | 32,785 | 0.17 |
+| C165948 | TYPE-C-31-M-12 | Extended | 222,702 | 0.19 |
+| C2842395 | TPS61099DRVR | Extended | 3,984 | 1.27 |
+| C92923 | MAKK2016T2R2M 2.2 uH | Extended | 2,712 | 0.08 |
+| C25770 | 270 kOhm 0402 1% | Extended | 139,988 | 0.004 |
+| C15127 | AO3401A | Basic | 469,801 | 0.09 |
+| C2480 | SS14 | Basic | 1,096,775 | 0.02 |
+| C1525 / C52923 / C19666 / C19702 | 100 nF / 1 uF / 4.7 uF / 10 uF | Basic | 3.3M-30.7M | <=0.03 |
+| C25092 / C25900 / C25905 / C25744 / C25741 / C26083 | 22R / 4.7k / 5.1k / 10k / 100k / 1M | Basic | 2.6M-27.4M | <=0.003 |
+
+Risks this surfaces, none of them blocking:
+
+- **MAX30101 stock is 304**, roughly ten times lower than anything else on the board and by far the
+  most expensive line. It is the one part where a delayed order could force a redesign. Nothing else
+  is close to supply-constrained.
+- **13 Extended part types.** JLCPCB bills a per-unique-Extended-type loading fee, historically
+  about $3 each with some waived. That is roughly $39 and is the dominant non-recurring cost on a
+  small prototype run. Confirm the actual figure in the cart.
+- **C25770 is the only Extended passive.** No Basic 0402 1% 270 kOhm exists in the JLCPCB library, so
+  restructuring the TPS61099 feedback divider to Basic-only values is not available without changing
+  the target voltage. Keep it.
+- **Two-sided SMT assembly is required** by the form factor (optical skin-side, MCU top-side). JLCPCB
+  supports it but it is a second assembly setup with its own cost and process risk, and it constrains
+  what may sit opposite tall or heavy parts. Quote both sides explicitly.
+- **The battery is not part of the shipment.** Permanent-attach solder pads mean the cell is
+  hand-soldered on arrival; JLCPCB ships a finished but unpowered board.
