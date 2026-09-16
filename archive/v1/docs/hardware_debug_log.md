@@ -34,13 +34,16 @@ pads, USB-C/charge area, and the direct-wired MAX30102 joints.
 
 ## Board swap (2026-07-19)
 
-The user replaced the original XIAO (old serial `SER=E0:72:A1:FC:4F:CC`) with a fresh
-XIAO ESP32S3. No re-provisioning needed — same PlatformIO config, native USB-Serial/JTAG
-(no drivers), board-agnostic firmware. A brand-new board may not enter upload mode on the
-first try; if it hangs at `Connecting...`, force the bootloader (hold BOOT, tap RESET,
-release BOOT, re-upload). Bring-up CONFIRMED: new board enumerated on `/dev/cu.usbmodem101`
-(serial `SER=E0:72:A1:FC:4F:80`), accepted uploads, ran firmware over USB. No forced-bootloader
-step was needed.
+The user replaced the original XIAO with a fresh XIAO ESP32S3. No re-provisioning needed — same
+PlatformIO config, native USB-Serial/JTAG (no drivers), board-agnostic firmware. A brand-new board
+may not enter upload mode on the first try; if it hangs at `Connecting...`, force the bootloader
+(hold BOOT, tap RESET, release BOOT, re-upload). Bring-up CONFIRMED: new board enumerated on
+`/dev/cu.usbmodem101`, accepted uploads, ran firmware over USB. No forced-bootloader step was needed.
+
+**Serial numbers removed (2026-09-15).** This doc and `CLAUDE.md` previously recorded *opposite*
+mappings of which `SER=` was the original vs. the replacement, so neither could be trusted. The IDs
+are gone rather than misleading. Net effect: **which physical unit is in use now is unestablished**,
+so assume the thermal-fault history below *may* apply to it. Re-derive from the live board if needed.
 
 ## Battery wiring saga (2026-07-19 → 2026-07-20)
 

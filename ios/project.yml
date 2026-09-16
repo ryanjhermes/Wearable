@@ -1,0 +1,35 @@
+name: Wearable
+options:
+  bundleIdPrefix: com.pioneer.wearable
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Wearable:
+    type: application
+    platform: iOS
+    sources:
+      - path: Wearable
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pioneer.wearable.Wearable
+        TARGETED_DEVICE_FAMILY: "1"   # iPhone only
+        GENERATE_INFOPLIST_FILE: NO
+    info:
+      path: Wearable/Info.plist
+      properties:
+        CFBundleDisplayName: Wearable
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Required on iOS 13+. The app will crash on first CBCentralManager
+        # use without this key.
+        NSBluetoothAlwaysUsageDescription: >-
+          Connects to the Wearable-HR prototype to display live heart rate.

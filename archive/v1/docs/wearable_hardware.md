@@ -1,5 +1,13 @@
 # Wearable Hardware List
 
+> **STATUS (2026-09-14): this document describes the CURRENT BREAKOUT-BASED PROTOTYPE only.**
+> It is not a bill of materials for the miniaturized version. The project is moving toward a custom
+> carrier PCB, and **part selection for that board is OPEN — nothing is final.** Candidate swaps
+> (MAX30101, TMP117/MAX30205, ESP32-C3-MINI-1) and the two questions gating them (prototype track vs
+> fab track; the undiagnosed wrist-PPG wavelength) are tracked in `CLAUDE.md` under
+> "Part selection — NOTHING IS FINAL". Do not treat anything below as a decision for the new board.
+> Also note the MLX90614 here is **suspected dead** (last `Error -1` 2026-07-14).
+
 This document tracks the main hardware components used in the wearable prototype, including the microcontroller, sensors, interfaces, and notes for wiring/software.
 
 ---
