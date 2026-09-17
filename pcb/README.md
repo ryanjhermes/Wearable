@@ -19,16 +19,24 @@ never a basis for anything. This project starts from scratch.
 | `symbols/wearable_v2.kicad_sym` | Project symbols: the five parts with no stock-library equivalent |
 | `pcb.pretty/` | Project footprints — **all three now present and verified** |
 | `pcb.3dshapes/` | STEP models for the module and inductor (needed later for enclosure fit) |
-| `bom_from_schematic.csv` | BOM generated from the schematic (51 populated parts) |
-| `build.py`, `schgen.py`, `libtool.py`, `sexp.py`, `mksym.py`, `gen_lib.py` | Bootstrap generator |
+| `bom_from_schematic.csv` | BOM generated from the schematic — 25 lines, 51 populated parts, with `Qty`/`MPN`/`LCSC` |
+| `.kicad-happy.json` | Config for the `kicad-happy` analysis skills: supplier, design intent, rail voltages, suppressions |
+| `datasheets/` | MPN-named symlinks into `parts/*/datasheet.pdf`, so the analyzers can verify pinouts |
 
-### The generator is a bootstrap, not a source of truth
+### The bootstrap generators have been removed
 
-`build.py` wrote the first `.kicad_sch`. **Do not re-run it over an edited schematic** — it
-overwrites the file and would discard your placement, wiring and any parts you added. It is kept
-only so the provenance of the first draft is auditable. After the first edit in KiCad, the
-`.kicad_sch` is the only source of truth and all changes are made in KiCad or by patching that
-file directly.
+`build.py` and its helpers (`schgen.py`, `libtool.py`, `sexp.py`, `mksym.py`, `gen_lib.py`) wrote
+the first `.kicad_sch` and were deleted once it had been hand-edited. Re-running any of them
+regenerates the schematic from scratch and discards every placement, wire and fix — and one of
+their defects (never emitting `(junction ...)` items) had already cost a silent open on the 3.3 V
+rail. They remain in git history at commit `2c00110` if the provenance of the first draft is ever
+needed. **The `.kicad_sch` is the only source of truth.**
+
+### Part properties
+
+Every BOM symbol carries both an `MPN` and an `LCSC` property. `MPN` was added 2026-09-16 — the
+sourcing gate and the JLCPCB BOM/CPL export both key on it, and without it the analyzers refuse
+to call any electrical finding "verified".
 
 ## Sheet layout
 
@@ -59,6 +67,13 @@ long drawn wires, so blocks can be moved without re-routing.
   per-value quantity matches (100 nF x8, 1 uF x6, 4.7 uF x2, 10 uF x4, 22R x2, 4.7k x2, 5.1k x2,
   10k x5, 100k x2, 1M x3, 270k x1, 14 non-passives).
 - **Pinouts checked against the local datasheets in `parts/`** for every IC.
+- **A third silent open was found and fixed on 2026-09-16: U4 pin 1 (VIN) was on no net**, so the
+  board had no 3.3 V rail at all. The wire T'd into the middle of the VSYS wire, and KiCad does
+  not connect a mid-wire T without an explicit `(junction ...)` item — of which the generated
+  schematic had **zero**. Two junctions were added. Every wire endpoint and symbol pin in the
+  schematic was then swept for the same failure mode; **U4 VIN was the only instance.** Verified
+  against `kicad-cli`'s own exported netlist, not a third-party parser: `VSYS` now carries
+  `U4.1` and `U4.3`, and `unconnected-(U4-V_{IN}-Pad1)` is gone.
 
 ## Verification NOT done — do not treat this as reviewed
 

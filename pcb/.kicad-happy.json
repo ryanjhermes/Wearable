@@ -1,0 +1,67 @@
+// kicad-happy project config — read automatically by the kicad, emc, bom and
+// spice skills. See kicad-happy/skills/kicad/references/config-reference.md
+{
+  "version": 1,
+
+  "project": {
+    "name": "Wearable v2 carrier board",
+    "number": "wearable_v2",
+    "revision": "A",
+    "author": "ryanjhermes",
+    "market": "us",
+    "emc_standard": "fcc-class-b",
+    "compliance_market": "us",
+    "ambient_temperature_c": 32           // worn against skin, inside a sealed TPU band
+  },
+
+  // JLCPCB assembly is the confirmed single fab+assembler, so LCSC is primary.
+  "preferred_suppliers": ["lcsc", "digikey"],
+
+  "bom": {
+    "field_priority": ["MPN", "LCSC"],
+    "group_by": "value+footprint"
+  },
+
+  "design_intent": {
+    "product_class": "prototype",
+    "ipc_class": 2,
+    "target_market": "consumer",
+    "preferred_passive_size": "0402",
+    "operating_temp_range": [0, 45]       // wrist-worn, indoor/outdoor human use
+  },
+
+  "analysis": {
+    "output_dir": "analysis",
+    "retention": 5,
+    "auto_diff": true,
+    "track_in_git": false,
+    "diff_threshold": "minor",
+    "power_rails": {
+      "flag": ["VBUS", "BAT+", "VSYS"],   // unregulated / battery-side rails
+      "voltage_overrides": {
+        "VSYS": 3.9,                      // Schottky-dropped VBUS or the cell, whichever is higher
+        "+3V3": 3.3,
+        "+1V8": 1.8,
+        "+4V7": 4.704                     // TPS61099, 1M/270k divider
+      }
+    }
+  },
+
+  "suppressions": [
+    {
+      "rule_id": "VM-001",
+      "nets": ["SDA", "SCL"],
+      "reason": "Intentional and datasheet-verified. MAX30101 (U7) runs VDD=1.8V but its SDA/SCL absolute maximum is +6.0V, so the shared 3.3V I2C bus needs no level shifter. See parts/max30101/ and the 'Parts intentionally not included' table in parts/V2_BOM.md."
+    },
+    {
+      "rule_id": "PU-001",
+      "components": ["U7", "U8"],
+      "reason": "MAX30101 INT and TMP117 ALERT are deliberately left unconnected and polled in firmware, saving two pull-ups and two GPIO. Documented decision in parts/V2_BOM.md."
+    },
+    {
+      "rule_id": "PU-001",
+      "components": ["U9"],
+      "reason": "LSM6DS3TR-C INT1/INT2 are push-pull outputs (not open-drain) and are unused in v2; wake-on-motion would route INT1 straight to a GPIO with no pull-up. Documented in parts/V2_BOM.md."
+    }
+  ]
+}

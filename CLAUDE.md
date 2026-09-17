@@ -28,17 +28,36 @@ TPS61099 EN is `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD r
 **PCB layout STARTED (2026-09-16) — [`pcb/LAYOUT_HANDOFF.md`](pcb/LAYOUT_HANDOFF.md) is the authority
 for the layout task and supersedes this file on PCB state.** F8 (Update-PCB-from-Schematic) was run:
 64 footprints landed (51 BOM + 12 test points + 1 battery-pad). Board Setup is mostly configured;
-**nothing is placed or routed yet.** Two things are OPEN as of session end and must be handled before
-placement:
-- **A THIRD silent first-spin killer surfaced post-F8 and is NOT yet fixed: U4 (ME6211 3.3 V LDO) pin 1
-  VIN sits on an `unconnected-` net — no 3V3 rail, therefore no ESP32, no sensors, no 1V8.** ERC missed
-  it because the section-G PWR_FLAGs added during capture mask exactly this warning class — so
-  "ERC: 0 errors" above does NOT mean connectivity-verified. Fix in the schematic (wire U4 pin 1 to
-  VSYS), re-run ERC, re-run F8, and sweep every IC power/enable pin for `unconnected-` nets first.
-- **The board file must live at `pcb/wearable_v2.kicad_pcb`** — KiCad pairs board↔schematic by
-  filename. A File>Save As left a divorced standalone at `pcb/symbols/wearable_v2.pcbeditor.*`; as of
-  session end that stray board still exists and `pcb/wearable_v2.kicad_pcb` does NOT. Relocate/rename it
-  and delete the stray `symbols/` project (keep only `wearable_v2.kicad_sym`); use Ctrl+S, never Save As.
+**nothing is placed or routed yet.** Both items that were open at the previous session's end are now
+CLOSED:
+- **The third silent first-spin killer (U4 VIN unconnected) is FIXED and verified (2026-09-16).**
+  Root cause was not a missing wire: the U4-pin-1 wire *ended mid-span* of the vertical VSYS wire, and
+  **KiCad does not connect a mid-wire T without an explicit `(junction ...)` item — the generated
+  schematic contained ZERO junctions.** Two junctions were added. Verified with `kicad-cli` (installed
+  at `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli`, 10.0.5): `unconnected-(U4-V_{IN}-Pad1)`
+  is gone, net `VSYS` now carries `U4.1` and `U4.3`, and ERC reports **0 errors / 2 warnings** (the two
+  benign LSM6DS3TR-C strap ties). **Every wire endpoint and symbol pin was then swept for the same
+  failure mode — U4 VIN was the only instance**, and no other power or enable pin sits on an
+  `unconnected-` net. Note the general lesson: "ERC: 0 errors" is NOT connectivity-verified, because
+  the section-G PWR_FLAGs mask exactly this warning class. **The `.kicad_pcb` netlist is now stale —
+  re-run F8 in KiCad before placing anything.**
+- **The board file now lives at `pcb/wearable_v2.kicad_pcb`** (KiCad pairs board↔schematic by
+  filename) and the divorced standalone board from the File>Save As incident is gone. A leftover
+  `pcb/symbols/wearable_v2.pcbeditor.kicad_pro` is queued for deletion. Use Ctrl+S, never Save As.
+
+**Design-review tooling — the `kicad-happy` plugin (added 2026-09-16).** Cloned at `kicad-happy/`
+(gitignored, nested git repo) and symlinked into `.claude/skills/` as 11 skills: `kicad`, `bom`,
+`datasheets`, `emc`, `spice`, `jlcpcb`, `pcbway`, `lcsc`, `digikey`, `mouser`, `element14`. All
+symlinks resolve. Use `python3 kicad-happy/skills/kicad/scripts/analyze_schematic.py` /
+`analyze_pcb.py` instead of writing ad-hoc parsers — it independently caught the U4 defect.
+`pcb/.kicad-happy.json` configures it (LCSC primary, 0402 passives, `MPN`-then-`LCSC` field priority,
+rail voltage overrides, and documented suppressions for three known false positives: VM-001 on
+SDA/SCL because the MAX30101's I2C pins are +6.0 V tolerant, and PU-001 on U7/U8/U9 because those
+interrupt pins are deliberately polled or unused). `pcb/datasheets/` holds MPN-named symlinks into
+`parts/*/datasheet.pdf` (13 of 25 BOM lines covered; the gaps are the Samsung caps, UNI-ROYAL
+resistors and the MAKK2016 inductor). **Every BOM symbol now also carries an `MPN` property**
+alongside the `LCSC` one — 51/51 coverage, which clears the analyzers' sourcing gate and is what the
+JLCPCB BOM/CPL export keys on. KiCad's own CLI is the authority when the two disagree.
 
 **The user has NO electrical-engineering experience** — layout guidance must be click-level (menu path,
 exact field, exact value); do not assume KiCad fluency, and be conservative with tool calls / large
