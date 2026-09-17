@@ -25,6 +25,25 @@ and the `.kicad_sch` gets patched. **`pcb/build.py` is a one-shot bootstrap gene
 edit in KiCad the `.kicad_sch` is the sole source of truth; do NOT re-run it or your edits are lost.**
 TPS61099 EN is `PPG_PWR_EN` on GPIO10 with a 100 kOhm pulldown so MAX30101 VDD rises before VLED+.
 
+**PCB layout STARTED (2026-09-16) — [`pcb/LAYOUT_HANDOFF.md`](pcb/LAYOUT_HANDOFF.md) is the authority
+for the layout task and supersedes this file on PCB state.** F8 (Update-PCB-from-Schematic) was run:
+64 footprints landed (51 BOM + 12 test points + 1 battery-pad). Board Setup is mostly configured;
+**nothing is placed or routed yet.** Two things are OPEN as of session end and must be handled before
+placement:
+- **A THIRD silent first-spin killer surfaced post-F8 and is NOT yet fixed: U4 (ME6211 3.3 V LDO) pin 1
+  VIN sits on an `unconnected-` net — no 3V3 rail, therefore no ESP32, no sensors, no 1V8.** ERC missed
+  it because the section-G PWR_FLAGs added during capture mask exactly this warning class — so
+  "ERC: 0 errors" above does NOT mean connectivity-verified. Fix in the schematic (wire U4 pin 1 to
+  VSYS), re-run ERC, re-run F8, and sweep every IC power/enable pin for `unconnected-` nets first.
+- **The board file must live at `pcb/wearable_v2.kicad_pcb`** — KiCad pairs board↔schematic by
+  filename. A File>Save As left a divorced standalone at `pcb/symbols/wearable_v2.pcbeditor.*`; as of
+  session end that stray board still exists and `pcb/wearable_v2.kicad_pcb` does NOT. Relocate/rename it
+  and delete the stray `symbols/` project (keep only `wearable_v2.kicad_sym`); use Ctrl+S, never Save As.
+
+**The user has NO electrical-engineering experience** — layout guidance must be click-level (menu path,
+exact field, exact value); do not assume KiCad fluency, and be conservative with tool calls / large
+datasheet reads (see `pcb/LAYOUT_HANDOFF.md`).
+
 Two release gates are now RESOLVED: **offline-retention = summaries-only** (user decision), and the
 **module order code is forced to N4 (`C2838502`)** because N4X shows 0 stock at JLCPCB (see JLCPCB
 verification below). The **diagnostic LED was declined by the user**; 1V8 and 4V7 test pads replace it.
@@ -38,10 +57,16 @@ a labelled dashed rectangle now marks the 5.4 mm bare-antenna strip (of the modu
 11.2 mm carries pads); and the inductor's **courtyard was smaller than its own pads** (EasyEDA bug) and
 was rebuilt to ±1.85 × ±1.15 mm. STEP models for the module and inductor were also copied into
 `pcb/pcb.3dshapes/`. **Verification status: only 2 of 51 footprints are datasheet-verified** — the
-ESP32 was checked pad-by-pad against Espressif Fig 11-1, but the **MAKK2016 inductor is UNVERIFIED (no
-datasheet on file)** and the other 48 are still package-name matches only, so **footprint audit
-(release gate #5) remains OPEN.** A new `parts/makk2016/` folder was created but has no datasheet — it is
-the project's only `check_parts.py` gap. Also still open: exact protected-battery evidence,
+ESP32 was checked pad-by-pad against Espressif Fig 11-1, but the **MAKK2016 inductor's footprint
+(land pattern) is UNVERIFIED** and the other 48 are still package-name matches only, so **footprint
+audit (release gate #5) remains OPEN.** The inductor's **electrical ratings ARE now
+manufacturer-confirmed (Taiyo Yuden, 2026-09-16): 2.2 µH ±20%, Isat/Irms 1.5 A, DCR 0.16 Ω max,
+2.0×1.6×1.0 mm — current margin is comfortable, since the TPS61099's 0.8 A minimum switch limit bounds
+peak inductor current well under Isat.** What is still missing is only the recommended land-pattern
+drawing (LCSC's PDF endpoint serves a bot page), so `parts/makk2016/` holds a README but no
+`datasheet.pdf` — the project's only `check_parts.py` gap. (Taiyo Yuden renamed this part to
+LSANB2016KKT2R2M/LLANB2016KKT2R2M; LCSC still stocks the old C92923, so v2 is unaffected — the
+successors are the drop-in replacement if C92923 disappears.) Also still open: exact protected-battery evidence,
 independent electrical review, power-budget/thermal check, and the PCB layout itself.
 
 **JLCPCB single-supplier/assembler CONFIRMED (2026-09-16), queried against JLCPCB's own SMT assembly
@@ -385,8 +410,10 @@ ignores → empty `run_*.csv`. Its ONLY data path is BLE (no flash logging) — 
   five hand-authored symbols; `build.py`/`schgen.py`/`mksym.py`/etc. are the **one-shot bootstrap
   generator — do NOT re-run after editing in KiCad** (`.kicad_sch` becomes the sole source of truth).
   `pcb.pretty/` now holds all three project footprints (ESP32 + inductor imported from LCSC, battery
-  pads hand-authored) and `pcb.3dshapes/` the two STEP models. No PCB layout yet (next step is
-  Update-PCB-from-Schematic + floorplan). `README.md` documents it.
+  pads hand-authored) and `pcb.3dshapes/` the two STEP models. **Layout STARTED 2026-09-16: F8 has been
+  run and `pcb/LAYOUT_HANDOFF.md` is the layout authority** (board file, blocking U4-VIN defect, and the
+  stray `symbols/wearable_v2.pcbeditor.*` file incident are covered there — see the V2 status at top).
+  `README.md` documents the project.
 - `enclosure/` — **v2 placeholder, intentionally empty of geometry.** Blocked on the fab PCB: the
   enclosure can't be dimensioned until the board outline is fixed. See `enclosure/README.md`. The
   v1 box moved to `archive/v1/enclosure/`.

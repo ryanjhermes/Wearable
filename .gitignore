@@ -22,3 +22,6 @@ fp-info-cache
 *.kicad_sch-bak
 # VSCode "Local History" extension snapshots
 .history/
+
+# kicad-happy skills repo (nested git clone; symlinked from .claude/skills/)
+kicad-happy/
