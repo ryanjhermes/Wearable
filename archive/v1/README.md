@@ -17,6 +17,7 @@ current design.
 
 | Path | What it is | Still useful? |
 |---|---|---|
+| `V1_REFERENCE.md` | v1 firmware, XIAO board, breakout I2C and PlatformIO detail, moved out of `CLAUDE.md` 2026-09-17 | **Yes** — the reference for any v1 firmware work |
 | `docs/hardware_debug_log.md` | Bring-up narrative: board thermal fault, reverse-polarity battery saga, MLX90614 death, HR bring-up | **Yes** — the *root causes and diagnostic heuristics* transfer to any board |
 | `docs/wiring.md` | Breakout I2C wiring tables + scanner troubleshooting | Yes, while the prototype rig exists |
 | `docs/development_setup.md` | PlatformIO setup, boot/reset upload recovery | Partly — recovery steps transfer; the `platformio.ini` and board sections are S3-specific |
@@ -42,14 +43,19 @@ wrist-algorithm validation has never been run; MAX30101 selection is already loc
 
 ## What was carried forward
 
-The live-relevant content was already distilled into `CLAUDE.md` before archiving, so nothing
-load-bearing was lost:
+`CLAUDE.md` was slimmed to a pointer file on 2026-09-17 to stop it costing ~18k tokens on every
+message. The v1 technical detail it used to carry now lives in **`V1_REFERENCE.md`, in this folder**
+— nothing was lost:
 
-- I²C diagnostic heuristics → `CLAUDE.md` § Hardware & I2C
+- I²C diagnostic heuristics → `V1_REFERENCE.md` § Hardware & I2C
 - Battery verification procedure and the LiPo safety signatures → § Hardware & I2C
 - Boot/reset upload recovery → § Board, "Upload/monitor procedure"
 - Toolchain traps (Adafruit BusIO, dual PlatformIO cores) → § Known Toolchain Issues
-- BOOT/RESET test-pad requirement on the new PCB → § Physical constraints
+- PlatformIO envs, monitor filters and firmware architecture → § Toolchain, § Firmware Architecture
+
+Two v2-facing items stayed live: the BOOT/RESET test-pad requirement and the LiPo safety
+signatures are repeated in `CLAUDE.md` under "Hard rules" and "Locked constraints". V2 design
+rationale moved to `docs/DESIGN_HISTORY.md`.
 
 ## Known stale references inside this folder
 

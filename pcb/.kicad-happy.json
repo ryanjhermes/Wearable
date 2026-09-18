@@ -40,9 +40,9 @@
       "flag": ["VBUS", "BAT+", "VSYS"],   // unregulated / battery-side rails
       "voltage_overrides": {
         "VSYS": 3.9,                      // Schottky-dropped VBUS or the cell, whichever is higher
-        "+3V3": 3.3,
-        "+1V8": 1.8,
-        "+4V7": 4.704                     // TPS61099, 1M/270k divider
+        "3V3": 3.3,
+        "1V8": 1.8,
+        "4V7": 4.704                      // TPS61099, 1M/270k divider
       }
     }
   },

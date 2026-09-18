@@ -101,7 +101,7 @@ at order time.
 |---:|---|---|---|---|---|
 | 1 | MCU/radio | ESP32-C3-MINI-1-N4 | C2838502 | module, 13.2 x 16.6 mm | Observe antenna keepout; battery cannot overlap antenna |
 | 1 | PPG | MAX30101EFD+T | C2859066 | OLGA-14 | VDD is 1.8 V; green VLED needs guaranteed 4.5-5.5 V |
-| 1 | skin temperature | TMP117AIDRVR | C699536 | WSON-6 | ADD0 to ground; thermal placement determines measurement quality |
+| 1 | skin temperature | TMP117AIDRVR | C699536 | WSON-6 | ADD0 to ground. **TI says do NOT solder the thermal pad on a rigid PCB** — the +/-0.1 C accuracy spec assumes it unsoldered; soldering trades accuracy for response time. See the footprint audit in `../pcb/README.md` |
 | 1 | IMU | LSM6DS3TR-C | C967633 | LGA-14 | CS high; SA0, SDx, and SCx must not float |
 | 1 | ambient temperature/humidity | SHT40-AD1B-R3 | C2848306 | DFN-4 | Vent to ambient air; keep away from heat sources |
 | 1 | 3.3 V LDO | ME6211C33M5G-N | C82942 | SOT-23-5 | CE to VIN; do not substitute active-low ME6211H |
@@ -204,16 +204,26 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 | 3.3 V buck-boost | Avoids several parts; accepted tradeoff is reduced usable battery capacity |
 | Battery connector | Omitted; the protected cell wires are permanently soldered to marked pads with strain relief |
 
-## Schematic capture status — first draft exists 2026-09-16
+## Schematic and layout status — 2026-09-16
 
-A first schematic has been captured at [`../pcb/`](../pcb/) (KiCad 10). It is ERC-clean with
-0 errors, and its generated BOM reconciles exactly to the 51 populated components planned here,
-per-value quantities included. It is a first draft by a single author: no footprint audit, no
-independent electrical review, no power-budget check, no layout. Every gate below remains open.
+The schematic at [`../pcb/`](../pcb/) (KiCad 10.0.5) is frozen for layout purposes. It is ERC-clean
+with 0 errors and 2 understood warnings, and its generated BOM reconciles exactly to the 51
+populated components planned here, per-value quantities included. KiCad schematic-parity DRC reports
+0 parity issues and 0 footprint errors. Layout has started with 64 footprints loaded, but nothing is
+intentionally positioned or routed and no board outline exists. Independent electrical review and
+power-budget/thermal review remain open; the design is not ready to order.
 
 Two real defects were caught during capture and are worth recording because both would have killed
 a first spin silently: the IMU ground ties shorted the I2C bus to ground, and `BAT+` existed as two
 unconnected nets so the cell never reached the charger while the load-share gate floated off VBUS.
+
+**Footprint audit COMPLETE 2026-09-16 — release gate #5 is closed for pin maps, partially open for
+land patterns.** All 12 IC/connector/discrete pin maps were verified pad-by-pad against the
+manufacturer datasheets with **zero errors**, and all 16 footprints have courtyards that enclose
+their pads. Two land patterns remain unverifiable because the vendor does not publish them in the
+datasheet: **MAX30101** (Maxim land pattern 90-0602, external) and **MAKK2016** (no datasheet at
+all). One decision was surfaced and is open: whether to solder the TMP117 thermal pad. Full
+findings, including two layout rules extracted from the datasheets, are in `../pcb/README.md`.
 
 **Footprints complete 2026-09-16.** The three parts with no stock-library footprint were resolved:
 the ESP32-C3-MINI-1 and MAKK2016T2R2M were imported from LCSC with `easyeda2kicad`, and the battery
@@ -222,42 +232,40 @@ solder pads were hand-authored. Every schematic symbol now resolves to a footpri
 Figure 11-1 and its 5.4 mm antenna keepout is now marked in the footprint itself. The inductor
 footprint carried a courtyard smaller than its own pads, which was rebuilt.
 
-**One evidence gap opened by this work:** MAKK2016T2R2M had no `parts/` folder at all. One now
-exists at [`makk2016/`](makk2016/) but **has no manufacturer datasheet**, so its footprint, current
-rating and DCR are unverified. `check_parts.py` reports this as the project's only gap.
+**One evidence gap remains:** MAKK2016T2R2M has no dimensioned manufacturer land-pattern drawing on
+file. Its electrical ratings were confirmed, but its imported land pattern remains unverified.
+`check_parts.py` reports the missing manufacturer PDF as the project's only evidence gap.
 
-## Capture approval versus release approval
+## Layout approval versus release approval
 
-Schematic capture may begin now. The component classes, primary order codes, pinouts, rail topology,
-I2C addresses, USB connections, boot straps, and mandatory support parts are sufficiently defined to
-draw and review the circuit. During capture, use the exact manufacturer pin numbering and create net
-labels for every rail and fixed GPIO assignment documented here.
+The schematic is captured and frozen for layout purposes. The component classes, primary order
+codes, pinouts, rail topology, I2C addresses, USB connections, boot straps, and mandatory support
+parts are sufficiently defined to floorplan and route the board. Raise any suspected schematic
+change instead of editing it during layout.
 
-The schematic is **not** ready to freeze or order until all items below are closed. Layout must not
-start merely because a first schematic draft exists; first complete ERC and an independent pin/footprint
-review.
+The design is **not ready to order** until the remaining items below are closed. Provisional layout
+may continue, but independent electrical review is still required before fabrication.
 
-## Before schematic freeze or ordering
+## Before ordering or release
 
 1. Verify the exact battery evidence listed above; green, permanent attachment, and supervised
    charging are already locked.
-2. Lock the offline data-retention requirement. If full raw sessions must survive without a phone,
-   add storage before the schematic is frozen.
+2. ~~Lock the offline data-retention requirement.~~ **CLOSED 2026-09-16: per-second summaries use
+   internal flash; full raw sessions require a connected phone.**
 3. ~~Lock the exact module order code.~~ **CLOSED 2026-09-16: ESP32-C3-MINI-1-N4 (C2838502).**
    Espressif recommends N4X, but JLCPCB lists N4X (C9900263492) at **0 stock** while N4 shows 16,000
    in stock. N4 is therefore the only machine-placeable option at this assembler. It is NRND, not
    discontinued, and remains valid for a prototype spin. If a future spin needs N4X, the land pattern
    is identical but assembly sourcing must be rechecked and chip revision v1.1 SDK support confirmed.
-4. Draw and peer-check the load-share orientation, every regulator pinout, USB-C pin duplication,
-   and every no-connect/thermal pad against the local PDFs.
-5. Import the exact LCSC symbol/footprint for every IC and connector, then compare pad numbers to the
-   manufacturer datasheet. Never trust a symbol merely because its part number matches.
-6. Run ERC, generate the BOM from the schematic, and reconcile every line and quantity against this
-   document. The current expected populated count is 51.
+4. **Pinout/datasheet audit complete; independent electrical peer review remains open.** Recheck the
+   load-share topology and power-budget assumptions before fabrication.
+5. **Footprint pin-map audit complete.** MAX30101 and MAKK2016 vendor land-pattern evidence remains
+   unavailable; treat those footprints as documented residual risks.
+6. **ERC and BOM reconciliation complete:** 0 errors, 2 understood warnings, 51 populated parts.
 7. Confirm current stock, assembly class, lifecycle, and price in the JLCPCB cart. Use exact order
    codes; do not allow “similar” substitutions for regulators, MOSFETs, or connectors.
-8. Have another electrical review before PCB layout, then review antenna, optical, thermal, USB, and
-   switching-regulator placement before fabrication.
+8. Have another electrical review and review antenna, optical, thermal, USB, and switching-regulator
+   placement before fabrication.
 
 ## Primary design references
 
