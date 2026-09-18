@@ -11,11 +11,37 @@
       46.0,
       1.0
     ],
-    "case_outer_mm": [
-      28.0,
-      50.0,
-      12.4
+    "board_modelled_z_mm": [
+      -0.735,
+      0.345
     ],
+    "case_outer_mm": [
+      27.7,
+      49.7,
+      12.75
+    ],
+    "wall_thickness_mm": 1.6,
+    "board_pocket_clearance_each_side_mm": 0.25,
+    "parting_plane_z_mm": 0.345,
+    "pcb_ledge_width_mm": 1.25,
+    "pcb_ledge_bearing_on_board_mm": 1.0,
+    "pcb_hold_down_gap_mm": 0.05,
+    "pcb_hold_down_overlap_west_mm": 2.3,
+    "pcb_hold_down_overlap_east_mm": 1.0,
+    "lap_joint_depth_mm": 2.445,
+    "lap_joint_skirt_thickness_mm": 0.7,
+    "lap_joint_clearance_each_face_mm": 0.1,
+    "snap_latch_count": 4,
+    "snap_finger_mm": [
+      6.0,
+      0.7,
+      2.445
+    ],
+    "snap_finger_root_area_mm2": 4.2,
+    "snap_finger_root_volume_mm3": 2.1,
+    "snap_hook_projection_mm": 0.2,
+    "snap_hook_engagement_mm": 0.2,
+    "snap_peak_bending_strain_pct": 3.51,
     "battery_envelope_mm": [
       20.5,
       32.0,
@@ -29,19 +55,23 @@
     ],
     "battery_to_antenna_keepout_mm": 2.1,
     "battery_to_roof_mm": 0.35,
-    "battery_to_tallest_exported_pcb_mm": 0.955,
-    "battery_to_J1_vertical_mm": 0.25,
-    "battery_side_clearance_each_mm": 2.25,
+    "battery_to_module_vertical_mm": 0.805,
+    "battery_to_J1_vertical_mm": 0.105,
+    "battery_shelf_bearing_west_mm": 0.55,
+    "battery_shelf_bearing_east_mm": 0.7,
+    "battery_side_clearance_each_mm": 2.0,
+    "battery_end_stop_depth_mm": 0.6,
+    "battery_end_stop_engagement_mm": 7.7,
     "usb_opening_mm": [
       10.0,
-      4.6
+      4.0
     ],
     "usb_body_mm": [
       8.94,
       3.2
     ],
     "usb_opening_side_clearance_each_mm": 0.53,
-    "usb_opening_vertical_clearance_each_mm": 0.7,
+    "usb_opening_top_clearance_mm": 0.8,
     "max30101_hard_opening_mm": [
       5.4,
       7.7
@@ -58,7 +88,7 @@
     "tmp117_thermal_pad_mm": [
       3.0,
       3.0,
-      1.0
+      1.345
     ],
     "tmp117_nominal_interference_mm": 0.0,
     "sht40_vent_mm": [
@@ -68,14 +98,10 @@
     "sht40_vent_center_offset_mm": 1.4,
     "sht40_to_battery_end_mm": 1.2,
     "wire_keepout_to_antenna_keepout_mm": 33.6,
-    "snap_latch_count": 4,
-    "snap_tab_mm": [
-      4.0,
-      0.45,
-      2.3
-    ],
-    "snap_hook_projection_mm": 0.2,
-    "snap_slot_clearance_each_side_mm": 0.125,
+    "tray_floor_thickness_mm": 1.2,
+    "tray_floor_under_groove_mm": 0.72,
+    "tray_outer_wall_at_board_level_mm": 0.8,
+    "roof_thickness_mm": 0.55,
     "top_print_body_count": 1,
     "bottom_print_body_count": 1
   },
@@ -87,35 +113,45 @@
     "bottom_vs_U7_surrogate_mm3": 0.0,
     "top_vs_U10_surrogate_mm3": 0.0,
     "hard_shell_vs_battery_mm3": 0.0,
-    "cradle_vs_populated_pcb_mm3": 0.0,
     "battery_vs_populated_pcb_mm3": 0.0,
     "wire_keepout_vs_populated_pcb_mm3": 0.0,
     "assembled_top_vs_bottom_mm3": 0.0,
-    "snap_tabs_vs_populated_pcb_mm3": 0.0
+    "optical_gasket_vs_shell_mm3": 0.0,
+    "thermal_pad_vs_shell_mm3": 0.0
   },
   "checks": {
     "no_hard_shell_to_pcb_collision": true,
     "no_hard_shell_to_battery_collision": true,
-    "no_cradle_to_pcb_collision": true,
     "no_battery_to_pcb_collision": true,
     "wire_path_clear_of_populated_pcb": true,
+    "separate_shells_assemble_without_hard_overlap": true,
+    "compliant_parts_clear_of_hard_shell": true,
+    "pcb_supported_on_ledge": true,
+    "pcb_held_down_both_long_edges": true,
+    "pcb_lateral_slop_within_0p3": true,
+    "lap_joint_at_least_2mm_deep": true,
+    "snap_fingers_properly_rooted": true,
+    "snap_strain_within_petg_allowable": true,
+    "four_snap_latches_present": true,
     "battery_clear_of_antenna_keepout": true,
     "battery_has_roof_clearance": true,
+    "battery_supported_both_sides": true,
+    "battery_end_stop_blocks_antenna_drift": true,
     "usb_opening_clears_body": true,
+    "usb_opening_is_single_piece": true,
     "sht40_vent_not_covered_by_battery": true,
     "tmp117_pad_has_zero_nominal_interference": true,
-    "separate_shells_assemble_without_hard_overlap": true,
-    "snap_tabs_clear_populated_pcb": true,
-    "four_snap_latches_present": true,
+    "tray_floor_at_least_0p6_everywhere": true,
     "top_is_one_printable_solid": true,
     "bottom_is_one_printable_solid": true
   },
   "all_checks_pass": true,
   "limitations": [
     "CAD review only; print and physical fit test have not been performed.",
-    "Snap dimensions target a first PETG/nylon FDM trial; printer/material shrinkage may require tuning the 0.125 mm-per-side slot clearance or 0.20 mm hook projection.",
+    "Snap strain is the closed-form cantilever estimate eps = 1.5*t*delta/L^2, not FEA. PETG or nylon only; PLA will fatigue or snap when the lid is opened repeatedly.",
+    "The battery end stop bridges 13.2 mm over the ESP32-C3-MINI-1 when the lid is printed roof-down; verify the bridge on the first print.",
     "J1, U7 and U10 use conservative surrogate solids because their KiCad STEP models were unavailable locally.",
-    "The 1.0 mm TMP117 pad is a nominal zero-interference volume; final soft-pad material/compression requires physical validation.",
-    "The supplied battery listing does not establish permission to charge at 100 mA."
+    "The USB-C mouth is sized to the receptacle envelope, not to a specific cable overmold.",
+    "Final soft-pad and optical-gasket materials and compression require physical validation."
   ]
 }
