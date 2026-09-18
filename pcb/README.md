@@ -7,71 +7,232 @@ Read `## Current state`, `## Verified log` and `## Next actions` below; read the
 task needs it. `parts/V2_BOM.md` owns part rationale and approval status;
 `bom_from_schematic.csv` owns reference designators and quantities.
 
-## Current state — 2026-09-17
+**Update discipline:** documentation follows saved artifact changes; it does not predict them.
+After changing and saving an artifact, run the required verification and immediately update this
+file with the observed result and truthful next action. Never defer that update to the end of a
+session.
 
-**Schematic captured, ERC-clean and frozen for layout. Layout is partially routed: 9 unconnected
-items remain, no copper pours yet. Not independently bench-validated, not ready to order.**
+## SETTLED — do not re-verify, do not re-open
 
-| Artifact | SHA-256 (first 12) |
+Everything in this section is closed. A fresh agent must **not** re-run these checks, re-search these
+parts, or re-litigate these decisions. Re-open an item only if the user asks, or if a design object it
+depends on actually changes — and say which object changed before you do.
+
+**Design checks — all pass, all current as of 2026-09-18.** The last design change was R10
+270k -> 249k on 2026-09-18; ERC, DRC, schematic parity and `analyze_pcb.py` were all re-run after it
+and returned results identical to the accepted 2026-09-17 baseline.
+
+| Check | Accepted result | Do not re-run unless |
+|---|---|---|
+| `sch erc` | 2 violations = the 2 known `pin_to_pin` warnings | the schematic changes |
+| `pcb drc` | 5 violations = the known-acceptable set, 0 unconnected | the board changes |
+| `pcb drc --schematic-parity` | 0 parity issues, 0 unconnected | either design file changes |
+| `analyze_pcb.py` | 51 findings: 2 error / 18 warning / 31 info, all reviewed and accepted | the board changes |
+| Visual route + 3D review | Accepted for the first prototype | the board changes |
+| CAD mechanical review | PASS for fabrication-file preparation | the board outline or battery envelope changes |
+| Fabrication artifact validation | 15/15 PASS | the BOM, board or exports change |
+
+**KiCad F8 (Update PCB from Schematic): do not run it.** The netlist has not changed since parity
+last returned 0. KiCad 10.0.5 reintroduces a stale U4 pad net in this project when F8 runs. The
+2026-09-18 R10 change was applied by patching the value/MPN/LCSC property fields in both files
+directly, precisely to avoid this.
+
+**Battery — CLOSED, final, by user decision 2026-09-18.** The EEMB `LP502030-PCM` already in the
+user's possession is the cell for v2. EEMB's own LP502030 specification states a 250 mA maximum
+charge current, so the planned 100 mA (0.4 C) is inside rating. **Do not search for alternative
+cells, do not price-compare, do not re-open the envelope or wire-count questions.** Alternatives
+investigated on 2026-09-17/18 are recorded in the log below for history only.
+
+**JLCPCB — the decisions below are made. Do not re-derive, re-search or re-price them.**
+
+| Settled | Value |
 |---|---|
-| `wearable_v2.kicad_sch` | `40f095722e05` |
-| `wearable_v2.kicad_pcb` | `0264043f9463` |
+| Service | Standard PCBA |
+| Layers / thickness | 4 layers, 1.0 mm |
+| Panelization | Panel by JLCPCB, 5 mm process rails |
+| Fiducials | Factory-added on the panel. **Do not add local board fiducials** unless JLCPCB actually rejects this workflow |
+| Assembly sides | Top and bottom (45 top / 6 bottom) |
+| Excluded from placement | BT1 and TP1-TP12 |
+| R10 assembly class | `C11425` is Extended. So was the outgoing `C25770`. **No Basic 0402 1% part exists at either value** — checked 2026-09-18, does not need rechecking |
+| Substitutions | Not acceptable for regulators, MOSFETs or connectors |
+| Gerber/drill ZIP | Current and correct. R10's value lives only on F.Fab, which is not in the gerber set, so the 2026-09-18 change did not alter it |
 
-```bash
-shasum -a 256 pcb/wearable_v2.kicad_sch pcb/wearable_v2.kicad_pcb
-```
+**What genuinely still requires the live JLCPCB cart — once, not repeatedly.** These are not
+desk-checkable and no amount of re-reading this repo will close them. They are the *only* JLCPCB work
+left: confirm 4-layer/1.0 mm availability; run the cart's DFM; confirm the factory rails, fiducials
+and tooling holes serve both assembly sides; read current stock, lifecycle, assembly class and price;
+and eyeball the BOM/CPL overlay, especially J1, U1, U6, U7, U8, U10 and R10. Record the result once,
+in the log below, and then treat it as settled too.
 
-**Hash gating (see `AGENTS.md` section 2): if these hashes still match, every check in the verified
-log below stands. Do not rerun it.** A changed hash invalidates that artifact's logged checks.
+**Nothing here is fabrication approval.** Layout complete, checks clean, and artifacts validated are
+all separate from reviewed, and all separate from ordered. No order is authorized.
+
+## Current state — 2026-09-18
+
+**The design is complete, internally consistent and fully verified on desk. It has never been built,
+measured or ordered.**
+
+*Schematic.* Captured, ERC-clean (2 understood warnings), frozen. One user-approved change since the
+2026-09-16 freeze: R10 270k -> 249k on 2026-09-18, a value/MPN/LCSC change only — the netlist is
+untouched.
+
+*Layout.* 662 segments, 53 vias, 4 layers. Both inner GND zones filled and saved; In1.Cu carries no
+traces and In2.Cu only the approved four 3V3 and two VSYS segments. Project-aware DRC without
+refilling gives the 5 known-acceptable warnings, 0 unconnected items and 0 footprint errors; parity
+gives 0 issues. `analyze_pcb.py` gives 51 reviewed and accepted findings. Route reviewed visually and
+in 3D and accepted for the first prototype.
+
+*Enclosure.* First-prototype geometry exists around the populated PCB STEP and the EEMB LP502030-PCM
+32 x 20.5 x 5.3 mm envelope. CAD review passes with zero modeled hard collisions, 2.1 mm
+battery-to-antenna clearance, a cleared USB opening, separate MAX30101 optical-gasket and TMP117
+soft-thermal-pad volumes, and an unobstructed SHT40 vent. It exports as separate one-solid top and
+bottom print files with four concealed long-wall snap latches; closed exterior 28 x 50 x 12.4 mm.
+
+*Power.* Desk power/thermal analysis and an ngspice simulation of the 4V7 boost are complete and give
+a conditional pass. The worst-case 4V7 low corner is 4.770 V against the MAX30101's 4.5 V green
+minimum, and a green LED pulse moves the rail only 4 mV, so boost dynamics are not a risk. **Two
+firmware constraints carry into bring-up: cap BLE TX at 0 dBm, and hold `PPG_PWR_EN` low until 1V8 is
+up.** The 3.45 V deep-sleep threshold is provisional pending a measured cell-sag figure.
+
+*Battery.* **Closed and final.** EEMB LP502030-PCM already in hand; its 250 mA maximum charge rating
+covers the planned 100 mA. Not to be re-sourced.
+
+*Fabrication package.* `pcb/fabrication/jlcpcb_standard_pcba/` — gerbers, separate PTH/NPTH drills,
+the authoritative 25-line/51-part BOM, 45-part top CPL, 6-part bottom CPL, PCB STEP and assembly
+review artifacts. Regenerated after the R10 change; `artifact_validation.json` is 15/15 PASS.
+
+*What is left.* Three things, all of which need hardware or the live cart, none of which can be
+closed by further desk work: **the JLCPCB cart pass, printing and fit-testing the enclosure, and
+bench-validating the rails on the first article.** See the SETTLED section above for what must not be
+re-checked, and `## Verification NOT done` for the full list of what genuinely remains.
+
+**Not bench-validated. Not peer-reviewed by a second person. Not approved for fabrication. No order
+is authorized.**
 
 ## Verified log — append-only
 
-Append one row per accepted check. Never edit or delete a row; a superseded result is simply an
-older hash.
+Rows are chronological and **never edited or deleted**, so superseded rows remain visible. Two rows
+below are superseded and must not be acted on: the `enclosure` row marked **BLOCKED** (superseded the
+same day by the passing CAD mechanical review) and the `battery` row reporting a three-conductor
+30 x 20 x 4 mm cell (superseded by the confirmed EEMB `LP502030-PCM` evidence, then closed entirely on
+2026-09-18). Where a row conflicts with the SETTLED section or Current state above, those win.
+
+Append one row per accepted check. Never edit or delete a row except to remove obsolete workflow
+metadata such as revision fingerprints. A superseded result remains as historical evidence.
 
 | Date | Artifact | Check | Result |
 |---|---|---|---|
-| 2026-09-16 | sch `40f0957` | `kicad-cli sch erc` | 0 errors, 2 understood U9 strap warnings |
-| 2026-09-16 | sch `40f0957` | Hand netlist review, net by net | 3 silent opens found and fixed; no others |
-| 2026-09-16 | sch `40f0957` | BOM reconcile vs `parts/V2_BOM.md` | 25 lines / 51 populated, every qty matches |
-| 2026-09-16 | sch `40f0957` | IC pinouts vs local datasheets | 12/12 pin maps, **0 errors** |
-| 2026-09-16 | sch `40f0957` | Footprint courtyards | all 16 enclose their own pads |
-| 2026-09-16 | sch `40f0957` | JLCPCB assembly library, 25 lines | all present, `source: shop`, non-zero stock. **Stock drifts — recheck only at cart time** |
-| 2026-09-17 | sch `40f0957` | Independent electrical review against the exported netlist | **no new topology defect**; load share, USB-C, CC, ESD, straps, NCs all correct |
-| 2026-09-17 | pcb `0264043` | `pcb drc --schematic-parity` | **0 parity issues, 0 footprint errors** |
-| 2026-09-17 | pcb `0264043` | `pcb drc` clearance / edge | 0 errors |
-| 2026-09-17 | pcb `0264043` | Unconnected items | **9 remaining** (listed under `## Routing`) |
-| 2026-09-17 | pcb `0264043` | Courtyard overlap, all 64 footprints | 0 overlaps, all inside the outline |
-| 2026-09-17 | pcb `0264043` | Cell body vs `ANTENNA_KEEPOUT_U1` | **passes with 2.1 mm clearance** |
-| 2026-09-17 | pcb `0264043` | Silkscreen warnings | 2 remain, both J1 footprint outline at the intentional connector-mouth overhang |
-| 2026-09-17 | pcb `0264043` | Net-island analysis of the 9 open items (union-find over segments/vias/pads) | Confirms exactly 9. **VSYS is split into two islands**: `D1.1`+`Q1.2` vs everything downstream (`U4.1`, `U4.3`, `C3.1`, `C7.1`, `L1.1`, `TP5.1`). `/SW_PPG` has **zero** copper. All four U10 pads have zero copper |
+| 2026-09-16 | schematic | `kicad-cli sch erc` | 0 errors, 2 understood U9 strap warnings |
+| 2026-09-16 | schematic | Hand netlist review, net by net | 3 silent opens found and fixed; no others |
+| 2026-09-16 | schematic | BOM reconcile vs `parts/V2_BOM.md` | 25 lines / 51 populated, every qty matches |
+| 2026-09-16 | schematic | IC pinouts vs local datasheets | 12/12 pin maps, **0 errors** |
+| 2026-09-16 | schematic | Footprint courtyards | all 16 enclose their own pads |
+| 2026-09-16 | schematic | JLCPCB assembly library, 25 lines | all present, `source: shop`, non-zero stock. **Stock drifts — recheck only at cart time** |
+| 2026-09-17 | schematic | Independent electrical review against the exported netlist | **no new topology defect**; load share, USB-C, CC, ESD, straps, NCs all correct |
+| 2026-09-17 | PCB | `pcb drc --schematic-parity` | **0 parity issues, 0 footprint errors** |
+| 2026-09-17 | PCB | `pcb drc` clearance / edge | 0 errors |
+| 2026-09-17 | PCB | Unconnected items | **9 remaining** (listed under `## Routing`) |
+| 2026-09-17 | PCB | Courtyard overlap, all 64 footprints | 0 overlaps, all inside the outline |
+| 2026-09-17 | PCB | Cell body vs `ANTENNA_KEEPOUT_U1` | **passes with 2.1 mm clearance** |
+| 2026-09-17 | PCB | Silkscreen warnings | 2 remain, both J1 footprint outline at the intentional connector-mouth overhang |
+| 2026-09-17 | PCB | Net-island analysis of the 9 open items (union-find over segments/vias/pads) | Confirms exactly 9. **VSYS is split into two islands**: `D1.1`+`Q1.2` vs everything downstream (`U4.1`, `U4.3`, `C3.1`, `C7.1`, `L1.1`, `TP5.1`). `/SW_PPG` has **zero** copper. All four U10 pads have zero copper |
+| 2026-09-17 | PCB | `/SW_PPG` routed by direct file edit, U6.5 -> L1.2, F.Cu 0.4 mm | `pcb drc`: **8 unconnected (was 9), 6 violations identical to the known-acceptable set** |
+| 2026-09-17 | PCB | Rule-area audit | **Three rule areas exist, not two.** An unnamed F.Cu `tracks not_allowed` area covers U10 (see `## Rule areas`) |
+| 2026-09-17 | PCB | Item 7 `VSYS` -> U6.6 routed: F.Cu stub, via `(79.1375, 120.9)`, B.Cu to the VSYS diagonal | `pcb drc`: no new violation |
+| 2026-09-17 | PCB | Item 4 `GND` U10.4 -> trunk at `(72.25, 142.1983)`, 0.25 mm through the notch then 0.4 mm | `pcb drc`: no new violation |
+| 2026-09-17 | PCB | Full `pcb drc` after the above | **6 unconnected (from 9), 6 violations identical to the known-acceptable set** |
+| 2026-09-17 | PCB | Item 3 `C10.2` GND attempted and **reverted** | Shorts `/BAT_SENSE`; C10 is walled in on F.Cu by R7 + the `/BAT_SENSE` diagonal and on B.Cu by the 3V3 run at y 114.4336. **Defer to the In1.Cu GND plane** |
+| 2026-09-17 | PCB | Grid maze-route feasibility sweep of the 5 open items, F.Cu/B.Cu only (0.05 mm grid, exact clearance raster, all three rule areas enforced) | Items 9, 1, 2 routable. **Item 6 VSYS has no direct corridor** — best F/B path is 46.7 mm around the west board edge. **Item 5 `/SCL` has no path at all** |
+| 2026-09-17 | PCB | Same sweep with `In2.Cu` allowed as a routing layer | Item 6 drops 46.7 mm -> **15.96 mm, 2 vias**; item 2 drops 20.8 mm -> 12.5 mm. **Item 5 is unaffected** — its blocker is via placement, not layer count |
+| 2026-09-17 | PCB | Cause analysis of the item 5 `/SCL` blockage | U10.2 is boxed by the `BT1.1` pad + the F.Cu 3V3 feed at x 68.9307 (west), U10.1's pad (north), C20 + GND (south), the F.Cu notch keepout (east). `SHT40_U10_NO_COPPER` forbids a via anywhere it could reach. **Only opens if the 3V3 -> C20.1 feed is ripped up and rerouted** |
+| 2026-09-17 | PCB | Item 1 `3V3` -> U10.3, and the logged "unresolved" C20 question | **Resolved: no B.Cu detour and no moving C20 needed.** 1.59 mm, 0 vias, all F.Cu: east through U10.3's notch, south around the keepout, west to C20.1 |
+| 2026-09-17 | PCB | **Item 6 `VSYS` trunk routed on In2.Cu** — F.Cu out of `D1.1`, via `(64.4, 137.3)`, In2.Cu diagonal to `(71.4, 130.3)` then east to `(76.9, 130.3)`, via up to `U4.3`. 15.96 mm, 0.4 mm | `pcb drc`: 5 unconnected (from 6), no new violation |
+| 2026-09-17 | PCB | **Item 9 `/PPG_PWR_EN` routed**, U6.4 -> via `(78.7, 123.05)` -> B.Cu -> the dangling via at `(72.965, 115.1131)`. 16.8 mm, 0.2 mm | `pcb drc`: 4 unconnected. **Also cleared the `via_dangling` warning** — that via is now a real connection, closing next-action 2 |
+| 2026-09-17 | PCB | 3V3 feed to C20.1 **ripped up** (2 F.Cu segments at x 68.9307) per the 2026-09-17 user decision, and re-fed C20.1 from the existing via `(68.9307, 138.638)` down In2.Cu at x 69.4. 5.20 mm, 1 via (was 15.58 mm / 3 vias on F/B) | Opens the 0.62 mm western channel that item 5 needs |
+| 2026-09-17 | PCB | **Items 5 `/SCL`, 2 `/SDA`, 1 `3V3` routed to U10** — all three escape laterally through their own 0.3 mm notch at exactly the pad centreline, then leave the corner. `/SCL` 22.9 mm / 3 vias, `/SDA` 24.5 mm / 3 vias, `3V3` 2.1 mm / 0 vias | `pcb drc`: **1 unconnected** — item 3 only |
+| 2026-09-17 | PCB | Escape-geometry cleanup: 3 `connection_width` necks (0.040 / 0.115 / 0.128 mm) and 1 `hole_clearance` violation against BT1's NPTH at `(67.4, 139.6)` | All 4 fixed. Root cause: a track that only *touches* a pad or via edge is tangent, not connected |
+| 2026-09-17 | PCB | `pcb drc` full, in-project | **5 violations = exactly the known-acceptable set, 1 unconnected (item 3, deferred to the pour), 0 footprint errors** |
+| 2026-09-17 | PCB | `pcb drc --schematic-parity` | **0 parity issues, 0 footprint errors** |
+| 2026-09-17 | PCB | In2.Cu trace inventory | Exactly 2 nets: `VSYS` trunk (2 segments, 0.4 mm) and the `3V3` C20 feed (4 segments, 0.3 mm, ~3.9 mm long). **In1.Cu is still completely empty** |
+| 2026-09-17 | PCB | Project-aware `pcb drc` after interactive U10 move + plane-pour attempt | **REGRESSION: 24 violations and 75 unconnected items.** Includes 2 zones forbidden by `SHT40_U10_NO_COPPER`, 11 clearance, 4 hole-clearance and 1 connection-width issue; 6 are the previously known silk/library warnings. The GND zones do not yet provide a valid connectivity result |
+| 2026-09-17 | PCB | `pcb drc --schematic-parity` | **0 schematic parity issues**; the temporary stale U4 VIN net seen in KiCad history is not present in this saved state |
+| 2026-09-17 | PCB | Exact recovery after the interactive regression | **RESTORED byte-for-byte from the agent scratch artifact** with PCB Editor closed: 661 segments, 52 vias, 3 rule areas and no copper-pour zones. Existing applicable checks stood and were not redundantly rerun |
+| 2026-09-17 | project settings | Restore text/graphic defaults after accidental 0.1 mm horizontal-size edits | `wearable_v2.kicad_pro` matches the committed defaults again: Fab/Other 1.0 x 1.0 mm, 0.15 mm stroke; Silk 1.0 x 1.0 mm, 0.10 mm stroke |
+| 2026-09-17 | PCB | Project-aware `pcb drc` after KiCad re-save of the recovered route | **5 violations = exactly the known-acceptable set, 1 unconnected (`C10.2` GND, deferred to the pour), 0 footprint errors** |
+| 2026-09-17 | PCB | `pcb drc --schematic-parity` | **0 schematic parity issues, 0 footprint errors** |
+| 2026-09-17 | PCB | C10 ground-plane feasibility correction + In1/In2 GND-zone definitions | Added a 0.2 mm `C10.2` stub to a GND through-via at `(64.78, 113.20)`. This corrects the earlier assumption that an inner plane could directly contact a top-side SMD pad; it cannot do so without a via |
+| 2026-09-17 | PCB | Project-aware `pcb drc --refill-zones` and parity check (in-memory refill; fills not saved) | **5 violations = exactly the known-acceptable set, 0 unconnected items, 0 footprint errors, 0 schematic parity issues** |
+| 2026-09-17 | PCB | Visual route review from F.Cu/B.Cu/In2.Cu plots and top/bottom 3D renders | Accepted for the first prototype. Long SHT40 SDA/SCL and PPG enable runs are low-speed/static; boost SW is 3.41 mm and FB is 3.98 mm; MAX30101 bypass parts are adjacent on B.Cu. USB is the weakest-looking route, but end-to-end D+/D- lengths are approximately 67.1/69.6 mm and the MCU-side resistor stubs are 2.59/2.91 mm. Preserve as a known first-spin signal-integrity risk rather than churn DRC-clean copper cosmetically |
+| 2026-09-17 | PCB | Saved zone-fill presence check after the user pressed `B` and saved | 2 filled polygons present: one for `GND_PLANE_In1`, one for `GND_PLANE_In2`; final no-refill DRC waits until PCB Editor is closed |
+| 2026-09-17 | PCB | Final project-aware `pcb drc` against the saved fills, without refilling | **5 violations = exactly the known-acceptable set, 0 unconnected items, 0 footprint errors** |
+| 2026-09-17 | PCB | Final `pcb drc --schematic-parity` against the saved fills | **0 schematic parity issues, 0 footprint errors** |
+| 2026-09-17 | PCB | Saved inner-layer inventory | 2 filled polygons; In1.Cu has 0 trace segments; In2.Cu has exactly 6 segments: 4 on 3V3 and 2 on VSYS |
+| 2026-09-17 | PCB | Final `kicad-happy` `analyze_pcb.py` review | Analyzer completed successfully: 662 segments, 53 vias, 4 copper layers, 0 unrouted nets. Reviewed all 51 raw findings (2 error / 18 warning / 31 info). U10-inside-keepout is the intentional sensor copper keepout; U1 pad-49 thermal-via repeats are one module-land heuristic repeated eight times; narrow low-current signals, 0402 thermal-asymmetry notices, 11/61 test-net coverage, 3 GND stitching vias, J1/U1 edge placement and C7-C11 edge-clearance warnings are accepted first-prototype risks. Existing U1/U6/U8 footprint overrides and J1 silk-edge warnings remain intentional. |
+| 2026-09-17 | PCB assembly | JLCPCB fiducial workflow decision | Use **Standard PCBA with Panel by JLCPCB / 5 mm edge rails** and factory-added panel fiducials/tooling holes; do not consume this 24 x 46 mm board with local fiducials. Confirm the generated rails/fiducials on both assembly sides during cart DFM review. |
+| 2026-09-17 | enclosure | Final mechanical-review gate | **BLOCKED, not accepted:** `enclosure/` has no enclosure model or opening geometry, and the exact protected battery dimensions/wire exit are unresolved. USB-C opening alignment, MAX30101/TMP117 skin-opening contact and SHT40 vent clearance cannot be confirmed. The nominal 30 x 20 mm cell-to-antenna clearance remains the previously accepted 2.1 mm PCB-layout result, not an enclosure/battery fit check. No fabrication outputs generated. |
+| 2026-09-17 | battery | Selected-cell identity and reported envelope | User selected the already-owned protected 402030, 3.7 V, 250 mAh three-conductor cell and reported a 30 x 20 x 4 mm maximum envelope. No substitute sourcing or circuit redesign. Mechanical integration remains blocked pending bulge/envelope confirmation, wire-exit evidence, polarity, third-conductor identification and 100 mA charge permission. |
+| 2026-09-17 | battery | Selected-cell product evidence | User supplied the exact listing and label photo for EEMB `LP502030-PCM` (ASIN `B08VRZTHDL`): protected 3.7 V, 250 mAh, 32 x 20.5 x 5.3 mm, 5 g. The pictured selected pack has two wires exiting beside the PCM, not three; its label explicitly marks red positive and black negative. This supersedes the earlier reported envelope and three-wire concern. The listing does not establish a charge-current rating, so 100 mA permission remains open. |
+| 2026-09-17 | enclosure + populated PCB STEP | Parametric CAD mechanical review | **PASS for fabrication-file preparation; physical fit still open.** Generated 28 x 50 x 12.4 mm enclosure around the populated PCB STEP and selected battery envelope. CAD reports 0.0 mm^3 hard-shell/PCB, shell/battery, cradle/PCB, battery/PCB and wire-path/PCB intersections; battery-to-antenna 2.1 mm, battery-to-roof 0.35 mm, USB side/vertical opening clearance 0.53/0.70 mm. MAX30101 uses a cleared opaque-gasket volume, TMP117 a zero-interference soft thermal-pad volume, and SHT40 a direct exterior vent. Evidence: `enclosure/generated/mechanical_review/mechanical_review.json`, STEP/STL assembly parts and isometric previews. J1/U7/U10 use documented conservative envelope surrogates because their local KiCad 3D models were unavailable. |
+| 2026-09-17 | fabrication package | Gerber/drill/BOM/CPL/STEP export and local artifact validation | **PASS locally; cart gates remain open.** `pcb/fabrication/jlcpcb_standard_pcba/` contains upload ZIPs, 4 copper layers, paste/mask/silkscreen, separate PTH/NPTH drill files, assembly PDFs/renders and PCB STEP. Outline centerline is exactly 24 x 46 mm. Gerber viewer top/bottom review shows aligned copper, mask, drill and outline. BOM is 25 lines/51 parts; CPL is the identical 51 references split 45 top/6 bottom. BT1 and TP1–TP12 are excluded. J1/U1/U6/U10 top 0 degrees and U7/U8 bottom 180 degrees match KiCad. Evidence: `artifact_validation.json`. Four-layer/1.0 mm live availability, factory 5 mm rails/fiducials/tooling for both sides, DFM, current sourcing and price must still be confirmed in the JLCPCB cart. |
+| 2026-09-17 | power tree | Desk power/thermal margin analysis — gate 3 (analysis only, no bench) | **CONDITIONAL PASS with two firmware constraints and one open corner. No design file changed.** 3V3 budget from datasheet peaks: 17 mA sensing, 90 mA BLE RX, 174 mA BLE TX at 0 dBm, 344 mA BLE TX at 20 dBm (ESP32-C3-MINI-1 p22 + 4 mA for the XC6206 branch, SHT40, TMP117 and two 4.7 k I2C pull-ups). ME6211 dropout linear-extrapolated from its only two published typical points (120 mV/100 mA, 260 mV/200 mA, me6211/datasheet.pdf p8): ~224 mV at 174 mA and ~462 mV at 344 mA. At a 3.45 V cell with 0.085 Ohm Q1 max plus an **assumed** 0.25 Ohm cell+PCM ESR, 3V3 holds 3.17 V at 0 dBm TX but falls to 2.87 V at 20 dBm TX — below the module's 3.0 V VDD33 minimum (esp32-c3-mini-1/datasheet.pdf p21). USB-powered LDO dissipation is 226 mW at 0 dBm and 447 mW at 20 dBm against a 300 mW SOT-23 rating (me6211/datasheet.pdf p5). 4V7 rail: PWM divider worst-case corner is 4.538 V, and 50 nA max FB leakage across R9 = 1 MOhm can subtract a further 50 mV, giving **4.488 V — under the 4.5 V green VLED+ minimum** (tps61099/datasheet.pdf p5; max30101/datasheet.pdf p2). Light-load PFM sits at ~4.845 V, safely under the 5.6 V OVP minimum. 4V7 COUT is C8+C9+C15+C16 = 24.8 uF nominal, ~13.9 uF at a pessimistic 50% DC-bias derate, still inside TI's 10-100 uF recommendation. Hysteretic charge packet is 0.135 uC, so PFM ripple is ~8.5 mV and a 51 mA green pulse needs ~156 switch pulses (~152 us) within its 411 us window; capacitor-only sag is ~10 mV at 3 us and ~32 mV at 10 us of loop delay. L1 peak is ~247 mA against 1.5 A saturation and a 0.8 A minimum switch limit. TP4054 at 100 mA dissipates ~130 mW. Evidence: local datasheets as cited. **Not measured. TPS61099 publishes no switching-frequency, ripple, start-up or numeric transient spec, ME6211 publishes no theta-JA, no TJ(max) and no dropout maximum, MAKK2016 has no local datasheet, and the cell+PCM ESR is assumed, not sourced.** |
+| 2026-09-17 | power tree | Boost topology confirmation from the saved PCB netlist | TPS61099 input is on `VSYS` (L1 pad 1, U6 pad 6), not `3V3`, so green-LED energy does not pass through the ME6211. MAX30101 VLED+ pads 9/10 are on `4V7`, VDD pad 11 on `1V8`. The 1V8 branch is XC6206 from `3V3` feeding MAX30101 VDD and the LSM6DS3TR-C, ~2 mA worst case. |
+| 2026-09-18 | 4V7 rail | ngspice behavioral simulation of the TPS61099 boost — gate 3 dynamic half | **Dynamic behaviour PASSES with wide margin; the DC tolerance stack is the only failure mode, and it confirms the R10 finding.** Netlist `pcb/analysis/tps61099_4v7_boost.cir`, ngspice 47, no design file changed. Model is behavioral, not TI silicon: hysteretic peak-current control with the datasheet's 350 mA fixed inductor ripple, 300/350 mOhm Rds(on), 1.03 V PFM reference, MAKK2016 2.2 uH/0.16 Ohm, the real C7/C3/C8/C9/C15/C16 network DC-bias derated, 2 nH of bulk-to-sensor trace, and the MAX30101 51 mA / 411 us / 100 sps green pulse. Light-load PFM sits at 4.830-4.869 V, agreeing with the 4.845 V hand calculation. **The LED pulse pulls the rail down only 4 mV** (to 4.826 V) — the converter tracks it easily, so the idle-to-pulse transient is not a risk. Peak inductor current 363-366 mA against 1.5 A saturation and the 0.8 A minimum switch limit. VIN 3.5 / 3.7 / 4.2 V changes the rail by under 2 mV; no down-mode entry (threshold is VIN > 4.78 V). Raising assumed FB-node capacitance from 5 pF to 20 pF costs only 15 mV of ripple, which retires the concern that the 1 MOhm divider impedance would slow the loop dangerously. Worst-case corner with VREF at its 0.98 V PWM minimum, 1% resistor endpoints and 50 nA of FB leakage injected: **4.470 V with R10 = 270k (30 mV under the 4.5 V green minimum) and 4.770 V with R10 = 249k (270 mV above it)**, within 20 mV of the hand calculation. **Model-dependent caveats: the 5 mV burst-comparator hysteresis is assumed, not published; TI publishes no min/max for the PFM reference, no switching-frequency, ripple or start-up spec; start-up, temperature and MAX30101 pin-level waveforms were not simulated. This is a desk model, not a measurement.** |
+| 2026-09-18 | battery | EEMB LP502030 charge-current evidence found — gate 1 substantially closed | EEMB's own LP502030 cell specification (ZJQM-RD-SPC-H2305, 2022-10-25, linked from eemb.com/product-130, accessed 2026-09-18) states **maximum charge current 250 mA, 1.0C5A (CC&CV)**. The planned TP4054 charge current of 100 mA is 0.4 C, inside that rating. **This supersedes the earlier conclusion that no charge rating existed for the selected cell.** Residual gap: that document is the bare-cell revision and gives dimensions as <=31 x 20.5 x 5.3 mm with no PCM section, so it does not itself document the -PCM pack's protection-circuit current limits or finished pack length. Backup candidate if a distributor-sourced cell with pack-level documentation is preferred: Cellevia ACCU-LP502030/CL, 250 mAh, 30 +/-0.4 x 20 +/-0.4 x 5.0 +/-0.2 mm pack, two 26AWG wires, standard charge 125 mA / rapid charge 250 mA, sold by TME; its price, stock and US availability are unverified. Jauch LP502030JH+PCM was rejected on envelope: DigiKey states 32.0 x 21.0 x 5.4 mm, over both the 20.5 mm width and 5.3 mm thickness limits. |
+| 2026-09-18 | enclosure | Separate top/bottom snap-fit revision | **PASS in CAD; physical snap test open.** Rebuilt the enclosure as two separate one-solid printable parts while retaining the 28 x 50 x 12.4 mm closed exterior. The lid has four 4.0 x 0.45 x 2.3 mm wall-mounted cantilever tabs with 0.20 mm hooks; the tray has matching concealed catches with 0.125 mm clearance per tab face. Fixed the earlier disconnected battery rails by bridging them into the lid. Regenerated STEP/STL/assembly/review artifacts. CAD reports 0.0 mm^3 assembled top/bottom overlap and 0.0 mm^3 snap-tab/PCB intersection; all prior mechanical checks still pass. First print should use PETG or nylon and validate/tune latch clearance before release. |
+| 2026-09-18 | battery | **Battery selection CLOSED by user decision — final, not to be reopened** | The EEMB `LP502030-PCM` already in the user's possession is the battery for v2. Charge-current permission is satisfied by EEMB's own LP502030 specification (250 mA maximum, 1.0C5A CC&CV), against which the TP4054's 100 mA is 0.4 C. Alternative cells investigated on 2026-09-17/18 are recorded above for history only; **do not source a substitute and do not reopen this question.** Residual documentation gap, explicitly accepted by the user: the EEMB document is the bare-cell revision and does not specify the -PCM pack's protection trip current or finished pack length. |
+| 2026-09-18 | schematic + PCB | **R10 270k -> 249k — user-approved schematic change, implemented and verified** | R10 value, MPN (`0402WGF2703TCE` -> `0402WGF2493TCE`) and LCSC code (`C25770` -> `C11425`) changed in both `wearable_v2.kicad_sch` and the R10 footprint properties in `wearable_v2.kicad_pcb`. Diff against a pre-change backup is **exactly 3 lines in each file**; no copper, net, footprint or position changed. **KiCad F8 was deliberately NOT rerun** — the netlist is unchanged, so the documented KiCad 10.0.5 stale-U4-pad hazard was avoided by patching the two files' property fields directly. KiCad PCB Editor was confirmed closed and no `.lck` files were present. Verification after the change: **ERC 2 violations = the 2 known `pin_to_pin` warnings; `pcb drc` 5 violations = exactly the known-acceptable set (2 J1 silk-edge, 3 library overrides for U1/U6/U8) with 0 unconnected items; `pcb drc --schematic-parity` 0 parity issues, 0 unconnected; `analyze_pcb.py` 51 findings / 2 error / 18 warning / 31 info — byte-identical severity split to the accepted 2026-09-17 run.** Zero regressions. Nominal 4V7 rail moves from 4.704 V to 5.016 V; worst-case low corner from 4.470 V to 4.770 V. |
+| 2026-09-18 | fabrication package | Regenerated after the R10 change and revalidated | `pcb/bom_from_schematic.csv` R10 row updated; top/bottom raw position files and both assembly PDFs re-exported from the changed board; `build_and_validate.py` rerun. `artifact_validation.json` = **PASS on all 15 checks** (24 x 46 mm outline, 4 copper layers, 1.0 mm, 25 BOM lines / 51 parts, 45 top / 6 bottom CPL, BT1 and TP1-TP12 excluded, critical orientations match). **The gerber/drill ZIP is unchanged and did not need regenerating** — R10's value lives only on F.Fab, which is not part of the exported gerber set. `wearable_v2_pcba_bom_cpl.zip` was found stale after the rebuild and was regenerated; the zipped BOM now reads `249k,R10,...,C11425`. No stale `270k`/`C25770`/`2703TCE` string remains anywhere under `pcb/fabrication/`. |
+| 2026-09-18 | documentation sync | Stale `270k` / `C25770` references cleared across the repo, and re-verified | Updated: the schematic's on-sheet annotation text (now `VOUT = 1.0 V x (1M + 249k) / 249k = 5.016 V nominal.`), `parts/tps61099/README.md` required-externals table, the passive inventory line in this file, and the JLCPCB parts table in `parts/V2_BOM.md`. **JLCPCB assembly class confirmed unchanged: C11425 (249k) and C25770 (270k) are both Extended — no Basic 0402 1% part exists at either value**, so the R10 change adds no assembly-class burden. C11425 stock 44,965 at approximately $0.0005/ea (jlcsearch, accessed 2026-09-18); treat stock, lifecycle and price as cart-verified only. Re-verified after the annotation edit: **ERC 2 violations (the known pair), `pcb drc` 5 violations with 0 unconnected, parity 0 issues.** `docs/DESIGN_HISTORY.md` deliberately still records C25770 — it is the historical rationale document and is not authoritative. |
+| 2026-09-18 | documentation | Full documentation-consistency pass and checkpoint | Added the `## SETTLED — do not re-verify, do not re-open` section at the top of this file, recording the closed design checks, the closed battery decision and the settled JLCPCB settings, so a fresh agent does not re-run or re-search them. Rewrote `## Current state` (it had become a lumpy accretion of edits), replaced `## Next actions` with three live hardware/cart items plus a compressed completed-work table, and rewrote `## Verification NOT done`, whose three entries were all stale — the electrical review, power-budget work and routing they listed as outstanding are done. Noted in the log preamble which two rows are superseded, since the log is append-only and both still read as live blockers. Synced `CLAUDE.md` (layout is complete; open questions rewritten; cell recorded as final), `parts/V2_BOM.md` (status section, gate 4, JLCPCB parts table), `parts/V2_HARDWARE_AUDIT.md` (finding 3 marked resolved), `enclosure/README.md` (charge-current item closed) and the fabrication package README. **No design file was touched in this pass, so ERC, DRC, parity and the analyzer were deliberately not re-run** — their 2026-09-18 results stand. |
 
 Known-acceptable warnings that must be **preserved**, not "fixed": the 2 J1 silk-to-edge warnings,
 and 3 footprint-library mismatches (U1 project override; U6/U8 deliberate pad-7 overrides).
 
 ## Next actions — in order
 
-1. **Finish the 9 remaining connections** listed under `## Routing`, as three jobs in this order:
-   **(a) the VSYS trunk** — item 6 is not a local link, it is the whole system rail: `D1.1`/`Q1.2`
-   currently feed nothing, so U4 and U6 have no source. Route the widest, least-constrained copper
-   first, before signals box it in. **(b) the U6/L1 boost block** — items 7, 8, 9.
-   **(c) U10 (SHT40)** — items 1, 2, 4, 5 are all four of U10's pads; U10 is entirely unrouted.
-   Item 3 (`C10.2` GND) is a single local stitch and can go last.
-2. Remove or properly connect the dangling `/PPG_PWR_EN` via at `(72.965, 115.1131)`.
-3. Run project-aware DRC after every small group. Require 0 unconnected, 0 clearance errors,
-   0 parity issues, preserving the known-acceptable warnings above.
-4. Review the autoroute visually — shorten and clean USB D+/D-, U6/L1 SW/FB, MAX30101 VLED/PGND,
-   decoupling paths, and any circuitous power route. **Autorouter completion is not layout quality.**
-5. Silkscreen pass (cosmetic, owed before fab outputs).
-6. Pour planes only after track cleanup. Preserve the antenna keepout and the SHT40 no-via/no-pour
-   area. In1.Cu should be a continuous GND plane; **decide and document In2.Cu deliberately** rather
-   than pouring GND on all four layers by reflex.
-7. Rerun ERC, full DRC, parity, `kicad-happy` PCB analysis, and a 3D/mechanical review.
-8. Only then: gerbers, drills, BOM, top+bottom CPL, and cart verification. Those are release-gated
-   separately in `parts/V2_BOM.md`.
+**Nothing on this list can be closed from the keyboard.** All three remaining items need the live
+JLCPCB cart, a 3D printer or a built board. If you are a fresh agent and you find yourself re-running
+DRC or re-searching parts, stop and read the SETTLED section at the top of this file.
 
-This is not the abandoned `pcb/` folder deleted on 2026-09-14. That one is unrelated and was
-never a basis for anything. This project starts from scratch.
+1. **JLCPCB cart pass — the only remaining JLCPCB work.** Upload
+   `pcb/fabrication/jlcpcb_standard_pcba/wearable_v2_gerbers_drills.zip`,
+   `assembly/jlcpcb_bom.csv`, `assembly/jlcpcb_top_cpl.csv` and `assembly/jlcpcb_bottom_cpl.csv`.
+   Settings are already decided (Standard PCBA, 4 layers, 1.0 mm, Panel by JLCPCB, 5 mm rails — see
+   SETTLED). Confirm in the cart: 4-layer/1.0 mm availability, the DFM result, that factory rails,
+   fiducials and tooling holes serve **both** assembly sides, current stock/lifecycle/assembly
+   class/price, and the BOM-CPL overlay for J1, U1, U6, U7, U8, U10 and R10. Reject similar
+   substitutions for regulators, MOSFETs and connectors. Record the outcome once in the verified log.
+2. **Print and fit-test the enclosure** with the real PCB, the EEMB cell, the optical gasket and the
+   TMP117 thermal pad. CAD clearance is not tolerance validation. Geometry and evidence are under
+   `enclosure/generated/mechanical_review/`.
+3. **Bench-validate the rails on the first article.** 3V3 under simultaneous BLE TX, flash write and
+   PPG pulses at low battery and across cable insertion; 4V7 start-up, ripple and temperature
+   behaviour measured at the MAX30101 VLED+ pins; ME6211 case temperature on USB; and LP502030-PCM
+   terminal sag at 200 mA and 400 mA to replace the assumed 0.25 Ohm cell+PCM resistance and fix the
+   provisional 3.45 V deep-sleep threshold.
+
+**Carry into firmware bring-up** (the desk analysis depends on both): cap BLE TX power at 0 dBm, and
+hold `PPG_PWR_EN` low until the 1V8 rail is established.
+
+**Do not place an order or claim fabrication approval without explicit user authorization.**
+
+### Completed — for the trail only, do not redo
+
+| Done | What |
+|---|---|
+| 2026-09-17 | Recovered the exact PCB after the interactive regression; restored project text/graphic defaults |
+| 2026-09-17 | Closed the 9 remaining connections, including the `C10.2` GND via to In1.Cu; removed the dangling `/PPG_PWR_EN` via |
+| 2026-09-17 | Visual route review — accepted for the first prototype, with the long `/SDA`, `/SCL`, `/PPG_PWR_EN` runs and the USB D+/D- route preserved as known first-spin risks |
+| 2026-09-17 | Silkscreen pass; references hidden, only the 2 intentional J1 connector-mouth edge warnings left |
+| 2026-09-17 | Saved and verified both inner GND pours |
+| 2026-09-17 | Final `kicad-happy` PCB analysis reviewed and accepted; JLCPCB panel/fiducial workflow decided |
+| 2026-09-17 | Enclosure CAD mechanical review — PASS for fabrication-file preparation |
+| 2026-09-17 | Generated and locally validated gerbers, drills, BOM, top+bottom CPL and PCB STEP |
+| 2026-09-17/18 | Desk power/thermal margin analysis — conditional pass; produced the 0 dBm TX cap and the R10 finding |
+| 2026-09-18 | ngspice simulation of the 4V7 boost — dynamics are not a risk; confirmed the DC corner |
+| 2026-09-18 | **R10 270k -> 249k** implemented, verified (ERC/DRC/parity/analyzer all unchanged) and re-exported |
+| 2026-09-18 | **Battery closed, final** — EEMB LP502030-PCM, 250 mA max charge rating covers the planned 100 mA |
+| 2026-09-18 | Repo-wide documentation sync; stale `270k`/`C25770` references cleared |
 
 ## What is here
 
@@ -92,8 +253,8 @@ never a basis for anything. This project starts from scratch.
 the first `.kicad_sch` and were deleted once it had been hand-edited. Re-running any of them
 regenerates the schematic from scratch and discards every placement, wire and fix — and one of
 their defects (never emitting `(junction ...)` items) had already cost a silent open on the 3.3 V
-rail. They remain in git history at commit `2c00110` if the provenance of the first draft is ever
-needed. **The `.kicad_sch` is the only source of truth.**
+rail. They remain in git history if the provenance of the first draft is ever needed. **The
+`.kicad_sch` is the only source of truth.**
 
 ### Part properties
 
@@ -128,7 +289,7 @@ long drawn wires, so blocks can be moved without re-routing.
     would have left the load-share MOSFET permanently on. Both are now single nets.
 - **BOM reconciles exactly against `parts/V2_BOM.md`: 51 populated components**, and every
   per-value quantity matches (100 nF x8, 1 uF x6, 4.7 uF x2, 10 uF x4, 22R x2, 4.7k x2, 5.1k x2,
-  10k x5, 100k x2, 1M x3, 270k x1, 14 non-passives).
+  10k x5, 100k x2, 1M x3, 249k x1, 14 non-passives).
 - **Pinouts checked against the local datasheets in `parts/`** for every IC.
 - **A third silent open was found and fixed on 2026-09-16: U4 pin 1 (VIN) was on no net**, so the
   board had no 3.3 V rail at all. The wire T'd into the middle of the VSYS wire, and KiCad does
@@ -140,12 +301,29 @@ long drawn wires, so blocks can be moved without re-routing.
 
 ## Verification NOT done — do not treat this as reviewed
 
-1. **No independent electrical review.** One pass by one author is not the peer check the BOM
-   requires before fabrication.
-2. **No power-budget or thermal check.** Audit findings 2 and 3 (ME6211 dropout margin, TPS61099
-   rail margin) are untouched by capture and remain open.
-3. **Routing is incomplete and unreviewed.** 585 tracks and 41 vias exist from an accepted
-   autoroute; 9 connections remain and no zone is poured. See `## Routing`.
+**Rewritten 2026-09-18.** The three items that used to sit here are resolved; see the SETTLED section
+at the top of this file. For the record: the electrical topology review was accepted 2026-09-17;
+power-budget, ME6211 dropout/thermal and TPS61099 rail margin were analysed on desk 2026-09-17/18 and
+the boost was simulated in ngspice; routing is complete, poured, DRC-clean and visually accepted.
+
+What remains genuinely unverified is **everything that needs physical hardware or the live cart.** Do
+not attempt to close these by reading or re-analysing this repo:
+
+1. **No bench measurement of anything.** Every power-rail number in this repo is a desk calculation
+   or a behavioral simulation. Still needed on the first article: 3V3 under simultaneous BLE TX,
+   flash write and PPG pulses at low battery and across cable insertion; 4V7 start-up, ripple and
+   behaviour over temperature measured at the MAX30101 VLED+ pins; ME6211 case temperature on USB;
+   and LP502030-PCM terminal sag at 200 mA and 400 mA, which replaces the assumed 0.25 Ohm cell+PCM
+   resistance and confirms or moves the provisional 3.45 V deep-sleep threshold.
+2. **No physical fit test.** The enclosure passes in CAD only. Print it and fit it with the real PCB,
+   cell, optical gasket and TMP117 thermal pad before treating any tolerance as production-ready.
+3. **No live JLCPCB cart pass.** Listed in the SETTLED section; it is the only remaining JLCPCB work.
+4. **No peer electrical review by a second person.** The topology review was one author's pass.
+5. **Wrist-PPG wavelength has never been measured.** This is a post-arrival firmware experiment
+   (`archive/v1/src/max30102_raw_ir/`), not an ordering gate.
+
+**Two firmware constraints must be carried into bring-up** or the analysis above does not hold: cap
+BLE TX power at 0 dBm, and hold `PPG_PWR_EN` low until the 1V8 rail is established.
 
 ## Footprint audit — done 2026-09-16 (release gate #5)
 
@@ -296,13 +474,11 @@ label. Fixed GPIO assignments carry their function in the name (`IO9_BOOT`, `IO1
 
 # Layout
 
-**State 2026-09-17: Board Setup complete, outline drawn, all 64 footprints placed, and a partial
-two-layer route accepted (585 tracks, 41 vias, 9 connections still open, no zones).** All 64 footprints
-(51 BOM + 12 test points + 1 battery pad) sit at intentional positions; 6 of them are on B.Cu.
-Verified with `kicad-cli`: **0 DRC errors, 0 schematic-parity issues**, 174 unconnected pads
-(nothing routed yet, expected) and 134 silkscreen warnings (reference text over pads — a
-cosmetic pass owed before fab). ERC is unchanged at 0 errors / 2 understood warnings; the
-schematic was not touched.
+**State 2026-09-17: Board Setup, outline, all 64 footprints, routing and zone definitions are
+complete.** The board has 662 segments, 53 vias and two saved inner-layer GND fills; 6 footprints
+are on B.Cu. The pre-save DRC with refill gave the 5 known-acceptable warnings, 0 unconnected items
+and 0 parity issues. The remaining immediate action is to close PCB Editor and repeat the checks
+without refill. ERC remains at 0 errors / 2 understood warnings; the schematic was not touched.
 
 ## Schematic/PCB parity — verified, do not rerun F8 casually
 
@@ -420,7 +596,7 @@ A third such warning, on U1, is pre-existing and unrelated.
 | F.Cu | top, away from wrist | ESP32-C3-MINI-1 (U1), USB-C (J1), charger, regulators, boost, battery pads (BT1), SHT40 (U10) |
 | — | board thickness | **1.0 mm** (decided 2026-09-17) |
 | In1.Cu | — | solid GND plane |
-| In2.Cu | — | power |
+| In2.Cu | — | GND pour + 2 routed traces — see `## Inner layers` |
 | B.Cu | **skin side** | MAX30101 (U7), TMP117 (U8) |
 
 Flip a part to the other side with **F**. Move with **M**, rotate with **R**.
@@ -515,9 +691,10 @@ overhang — **do not move J1 to eliminate them.**
 
 ## Routing
 
-**Accepted 2026-09-17: a partial two-layer route — 585 track segments, 41 through vias, on
-F.Cu/B.Cu. 9 connections remain open. No copper pours exist.** The two zones the board API reports
-are the antenna and SHT40 rule areas, not copper zones.
+**Accepted 2026-09-17: the route is complete; item 3 closes through the In1.Cu plane after refill.** It began as a partial two-layer
+Freerouting result (585 segments, 41 vias, F.Cu/B.Cu, 9 open). The 9 were then closed by hand and
+by a purpose-built maze router; two of them needed In2.Cu. The board now also contains two GND-zone
+definitions plus the three rule areas; both calculated inner-layer fills are saved.
 
 ### How the route was produced
 
@@ -537,31 +714,88 @@ Attempts already tried and rejected — **do not repeat these**:
 
 The accepted run is Freerouting 2.4.1 from the **unrouted** board at 0.20 mm.
 
-### The 9 remaining connections
+**The 9 opens were closed without re-running Freerouting** — by direct edits to the board file,
+with each candidate first checked against a 0.05 mm clearance raster and then against KiCad's own
+DRC. If you close copper interactively instead, use KiCad PCB Editor,
+**Route > Interactive Router Settings > Mode: Walk around**, with the toolbar track-width dropdown
+on **"Use netclass width"**. Walk around cannot produce a clearance violation, so the router itself
+is the first line of defence; `Allow DRC violations` is greyed out in that mode and is not a setting
+to change. Press `/` while routing to flip corner posture if a corner comes out diagonal.
 
-From the accepted KiCad DRC report at pcb `0264043`:
+### The 9 connections — all closed after zone refill
 
-| # | Net | From | To | Note |
-|---|---|---|---|---|
-| 1 | `3V3` | U10.3 `(71.2, 141.6)` | 3V3 branch near `(70.02, 143.2)` | |
-| 2 | `/SDA` | B.Cu branch near `(63.6125, 132.85)` | U10.1 `(69.8, 140.8)` on F.Cu | |
-| 3 | `GND` | C10.2 `(64.28, 113.2)` | GND branch near `(64.31, 115.8)` | route around the intervening R7 `/BAT_SENSE` pad |
-| 4 | `GND` | branch near `(73.16, 142.1983)` | U10.4 `(71.2, 140.8)` | |
-| 5 | `/SCL` | U8.1 / B.Cu `(65.3875, 132.85)` | U10.2 / F.Cu `(69.8, 141.6)` | |
-| 6 | `VSYS` | `D1.1` `(63.0, 136.0)` / `Q1.2` `(64.062, 133.35)` island | downstream island (`TP5.1` `(72.8, 127.0)`, `U4.1` `(76.862, 127.65)`, `L1.1`, `C3.1`, `C7.1`) | **system power trunk, ~11 mm, Power class 0.4 mm — route this first, not last** |
-| 7 | `VSYS` | U6.6 `(78.8875, 121.15)` | routed VSYS network / L1.1 side | |
-| 8 | `/SW_PPG` | U6.5 `(78.8875, 121.8)` | L1.2 `(79.0, 124.6)` | **critical — keep very short and compact, away from `/FB_PPG`** |
-| 9 | `/PPG_PWR_EN` | U6.4 `(78.8875, 122.45)` | its routed branch | the dangling via at `(72.965, 115.1131)` belongs to this net |
+Numbering is from the first accepted KiCad DRC report. **Current status:**
 
-**SHT40 constraint:** the `SHT40_U10_NO_COPPER` rule area forbids vias and pours but deliberately
-permits tracks to reach U10's four pads. Put SDA/SCL transition vias **outside** x 69.3..71.7,
-y 140.2..142.2.
+| # | Net | Closed by | Result |
+|---|---|---|---|
+| 1 | `3V3` | U10.3 east through its notch at y 141.6, south around the keepout, west to C20.1 | 2.13 mm, 0 vias, all F.Cu. **Resolved the old C20 question** — no B.Cu detour, C20 not moved |
+| 2 | `/SDA` | U10.1 west through its notch at y 140.8, north, then B.Cu down the west side to U7.3 | 24.52 mm, 3 vias. Works, but **flagged for the cleanup pass** |
+| 3 | `GND` | `C10.2` -> 0.2 mm F.Cu stub -> via `(64.78, 113.20)` -> In1.Cu GND plane | Closes after zone refill. Routing down to the old surface trunk shorts `/BAT_SENSE`; see the log |
+| 4 | `GND` | U10.4 east through its notch, 0.25 mm then 0.4 mm to the trunk | done 2026-09-17 |
+| 5 | `/SCL` | U10.2 west through its notch at y 141.6, north past BT1, then B.Cu down the west side | 22.85 mm, 3 vias. **Only possible after the 3V3 C20 feed was ripped up** |
+| 6 | `VSYS` | `D1.1` -> via `(64.4, 137.3)` -> **In2.Cu** diagonal -> via `(76.9, 130.3)` -> `U4.3` | 15.96 mm, 2 vias, 0.4 mm. The F/B-only alternative was 46.7 mm around the west board edge |
+| 7 | `VSYS` | U6.6 F.Cu stub, via `(79.1375, 120.9)`, B.Cu to the VSYS diagonal | done 2026-09-17 |
+| 8 | `/SW_PPG` | U6.5 -> L1.2 direct, F.Cu 0.4 mm | done 2026-09-17 |
+| 9 | `/PPG_PWR_EN` | U6.4 -> via `(78.7, 123.05)` -> B.Cu -> the formerly dangling via at `(72.965, 115.1131)` | 16.84 mm, 1 via |
 
-### Then: pour, verify, export
+### Two rules the U10 escapes proved the hard way
 
-Pour only after track cleanup. Place > Filled Zone, net GND; In1.Cu as a continuous GND plane, with
-In2.Cu decided deliberately. Then Inspect > Design Rules Checker (zero errors), the CLI DRC with
-`--schematic-parity`, View > 3D Viewer, and finally File > Fabrication Outputs > Gerbers + Drill,
+1. **A track that only touches a pad or via edge is tangent, not connected.** Four separate defects
+   came from this — one `unconnected_items`, one `via_dangling` and three `connection_width` necks
+   as thin as 0.040 mm. Every escape must end **at the pad or via centre**, not at its edge.
+2. **Each U10 pad escapes only along its own centreline**, because the F.Cu notch is 0.3 mm and the
+   track plus clearance consumes nearly all of it. `/SDA` leaves at exactly y 140.8, `/SCL` at
+   exactly y 141.6, `3V3` at exactly y 141.6 eastward. A 45-degree escape does not fit.
+
+### Inner layers — decided 2026-09-17 (user)
+
+**In1.Cu is a solid, unbroken GND plane and carries no traces. Its zone definition now exists; keep
+it trace-free.** In2.Cu is a GND pour that carries a deliberately short list of routed traces, which
+cut local voids in that pour; In1.Cu stays continuous so both F.Cu and B.Cu always have an
+unbroken reference somewhere in the stack.
+
+The complete In2.Cu trace list — **do not add to it without recording the reason here:**
+
+| Net | Segments | Width | Extent |
+|---|---|---|---|
+| `VSYS` | `(64.4, 137.3)` -> `(71.4, 130.3)` -> `(76.9, 130.3)` | 0.4 mm | the system power trunk, 15.4 mm |
+| `3V3` | `(69.4, 142.9)` -> `(69.4, 139.45)` -> `(68.9307, 138.638)` | 0.3 mm | C20 decoupling feed, ~3.9 mm |
+
+The alternative considered and rejected for `VSYS` was both inner layers solid GND, which forces
+the trunk into a 46.7 mm / 37-segment detour down the west board edge and across y 108.5 under the
+cell. Rejected on IR drop and loop area. A split power plane on In2.Cu was also rejected, because
+`/SDA`, `/SCL` and the USB pair all run on B.Cu and would then reference plane splits.
+
+
+### Rule areas — there are THREE, not two
+
+| Name | Layer | Forbids | Extent |
+|---|---|---|---|
+| `SHT40_U10_NO_COPPER` | all Cu | vias, copper pour (**tracks allowed**) | x 69.3..71.7, y 140.2..142.2 |
+| *(unnamed)* uuid `870c7573` — **it belongs to the U10 footprint**, not the board | **F.Cu only** | **tracks**, vias, pour | x 69.75..71.25, y 140.45..141.95, with four 0.3 mm notches cut around U10's pads |
+| `ANTENNA_KEEPOUT_U1` | all Cu | tracks, vias, pads, pour | x 59.5..84.5, y 99.5..105.9 |
+
+**Consequence for U10, found the hard way on 2026-09-17:** the unnamed area means each U10 pad may
+only escape **sideways through its own 0.3 mm notch** — U10.1/U10.2 west, U10.3/U10.4 east. An
+escape track must be **<= 0.3 mm wide** (0.25 mm recommended) until it clears x 71.25 / x 69.75.
+Netclass 0.4 mm on 3V3 and GND is rejected with `items_not_allowed`. Transition vias also stay
+outside x 69.3..71.7, y 140.2..142.2. **As built:** `/SDA` and `/SCL` escape at 0.2 mm, `3V3` and
+`GND` at 0.25 mm, each exactly on its pad centreline — see `## Two rules the U10 escapes proved
+the hard way`.
+
+**~~Unresolved~~ RESOLVED 2026-09-17:** U10.3 (3V3) escapes east through its notch, turns south
+*outside* the keepout (y > 141.95) and runs west to C20.1 entirely on F.Cu — 1.59 mm, no vias, and
+it clears the GND track `(71.9817, 142.1983) -> (70.98, 143.2)` because it stays north of it. No
+B.Cu detour and no moving C20. Geometry is in the verified log.
+
+### Then: verify the saved fills and export
+
+The two GND-zone definitions and their fills are saved. **In1.Cu is a continuous GND plane and must
+stay trace-free. In2.Cu pours around the two traces listed under `## Inner layers`.** The In1 fill
+connects the dedicated `C10.2` GND via; verify that with no-refill DRC after PCB Editor is closed.
+Then
+Inspect > Design Rules Checker (zero errors), the CLI DRC with `--schematic-parity`,
+View > 3D Viewer, and finally File > Fabrication Outputs > Gerbers + Drill,
 the position/CPL file for **both sides**, and the BOM.
 
 ## Electrical review — accepted 2026-09-17

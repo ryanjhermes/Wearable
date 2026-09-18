@@ -26,7 +26,7 @@ that was already done. That is the failure mode this section exists to prevent.
 - Re-check part stock, pricing, or availability that the log already records, unless the task is
   sourcing or the user asks.
 - Re-read datasheets for parts whose pinouts the log records as verified.
-- Re-run a check the log records as passing against the **current** file hash (see section 2).
+- Re-run a check the log already records as passing when the relevant design objects have not changed.
 - Survey the repo "for context" before starting. Read what the task needs, when it needs it.
 
 Prefer `grep`/`sed -n` over reading whole files. A 460-line document read in full to answer one
@@ -36,32 +36,28 @@ If a question is genuinely settled but the record is thin, say so and ask — do
 
 ---
 
-## 2. The verified log and hash gating
+## 2. The verified log and evidence freshness
 
 `pcb/README.md` carries an **append-only verified log**. Every accepted check is one row:
 
 ```
-| date | artifact hash (first 12) | check | result |
+| date | artifact | check | result |
 ```
 
-**The rule: if the current hash of an artifact matches the hash logged beside a check, that check's
-logged result stands. Re-running it is a protocol violation, not diligence.** Report the logged
-result and move on.
+Do not store or use document hashes as workflow gates. KiCad routinely rewrites and reorders files
+without changing the design, so hashes create false invalidations and confusing handoffs. Determine
+freshness from the verified log, the current-state section, `git diff`, and the specific design
+objects changed since a check.
 
-A hash change invalidates every logged check for that artifact. Those checks become open again and
-must be rerun before their results may be cited.
+A logged check stands unless the relevant design objects changed, the user asks for a rerun, or
+there is concrete evidence the result is wrong. When a change can affect a prior check, rerun that
+check and append the new observed result.
 
-Current hashes:
-
-```bash
-shasum -a 256 pcb/wearable_v2.kicad_sch pcb/wearable_v2.kicad_pcb
-```
-
-Exceptions, where a rerun is correct even on a matching hash:
+Other cases where a rerun is correct:
 
 - The user explicitly asks for a rerun.
 - You are about to change the artifact and want a pre-change baseline.
-- The logged result is ambiguous, or you have concrete evidence it is wrong. State the evidence.
+- The logged result is ambiguous. State why.
 
 ---
 
@@ -70,6 +66,12 @@ Exceptions, where a rerun is correct even on a matching hash:
 The Manager appends to the verified log **immediately after each accepted check or milestone**, not
 in a wrap-up at the end of the session. An agent that is cut off mid-task must leave the log already
 current.
+
+**Documentation follows the artifact change; it never predicts it.** First make and save the
+authorized artifact change, then run the required verification, then immediately update the current
+state, verified log and next-actions list with the observed result. Do not describe a planned edit
+as completed, do not leave changed design state undocumented, and do not postpone the documentation
+update until session wrap-up.
 
 Also keep the **Next actions** list in `pcb/README.md` ordered and truthful: strike what is done,
 add what the work revealed. Record only durable facts — verification results, decisions, remaining
@@ -114,15 +116,16 @@ single-step layout, DRC and documentation work is local.
 - An independent check is wanted precisely because it does *not* share the Manager's assumptions.
 - The work is exploratory and may be discarded.
 
-**Do not delegate** to re-verify something the verified log already covers at the current hash, to
-manufacture parallelism where none exists, or to avoid reading something small yourself.
+**Do not delegate** to re-verify something the verified log already covers when its relevant design
+objects have not changed, to manufacture parallelism where none exists, or to avoid reading
+something small yourself.
 
 Prefer read-only Workers. Grant write access only for an exact, exclusive file list.
 
 ### Manager loop
 
-1. Establish the baseline: `pcb/README.md` verified log + next actions, `git status --short`,
-   current artifact hashes, and any unresolved user decisions. Preserve unrelated changes.
+1. Establish the baseline: `pcb/README.md` verified log + next actions, `git status --short`, the
+   relevant diff, and any unresolved user decisions. Preserve unrelated changes.
 2. Decide local vs delegated per the test above.
 3. Spawn a fresh Worker per task. Codex: `fork_turns="none"`. Claude: a project subagent with a
    separate context. Pass only the task contract and the evidence it needs — never the transcript.
@@ -151,7 +154,7 @@ Concise return format:
 
 Use exact paths or narrow globs. State `none (read-only)` when no edits are permitted. Include
 unresolved user decisions and stop conditions. Name the checks the Worker must **not** rerun
-because the verified log already covers them at the current hash.
+because the verified log already covers them and their relevant design objects have not changed.
 
 A Worker stops and reports a blocker rather than broadening scope, deciding an unresolved option,
 or editing a forbidden file.

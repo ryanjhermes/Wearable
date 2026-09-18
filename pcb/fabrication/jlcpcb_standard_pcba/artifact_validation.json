@@ -1,0 +1,101 @@
+{
+  "result": "PASS",
+  "checks": {
+    "gerber_outline_is_24x46_mm": true,
+    "all_required_gerber_layers_present": true,
+    "exactly_four_copper_layers_exported": true,
+    "board_file_declares_1_0_mm_thickness": true,
+    "drill_files_present": true,
+    "bom_has_25_line_items": true,
+    "bom_has_51_parts": true,
+    "cpl_has_exactly_51_bom_refs": true,
+    "cpl_split_is_45_top_6_bottom": true,
+    "battery_and_testpoints_excluded": true,
+    "critical_orientations_match_kicad": true,
+    "gerber_viewer_top_evidence_exists": true,
+    "gerber_viewer_bottom_evidence_exists": true,
+    "pcb_step_exists": true,
+    "assembly_drawings_exist": true
+  },
+  "outline_centerline_bbox_mm": [
+    60.0,
+    -146.0,
+    84.0,
+    -100.0
+  ],
+  "outline_size_mm": [
+    24.0,
+    46.0
+  ],
+  "bom": {
+    "line_items": 25,
+    "placed_parts": 51
+  },
+  "cpl": {
+    "top_parts": 45,
+    "bottom_parts": 6,
+    "excluded_nonplacement_refs": [
+      "BT1",
+      "TP1",
+      "TP10",
+      "TP11",
+      "TP12",
+      "TP2",
+      "TP3",
+      "TP4",
+      "TP5",
+      "TP6",
+      "TP7",
+      "TP8",
+      "TP9"
+    ]
+  },
+  "critical_orientation_review": {
+    "J1": {
+      "layer": "Top",
+      "rotation_deg": 0.0,
+      "matches_expected": true
+    },
+    "U1": {
+      "layer": "Top",
+      "rotation_deg": 0.0,
+      "matches_expected": true
+    },
+    "U6": {
+      "layer": "Top",
+      "rotation_deg": 0.0,
+      "matches_expected": true
+    },
+    "U7": {
+      "layer": "Bottom",
+      "rotation_deg": 180.0,
+      "matches_expected": true
+    },
+    "U8": {
+      "layer": "Bottom",
+      "rotation_deg": 180.0,
+      "matches_expected": true
+    },
+    "U10": {
+      "layer": "Top",
+      "rotation_deg": 0.0,
+      "matches_expected": true
+    }
+  },
+  "drill_report": "drill/drill_report.rpt",
+  "gerber_viewer_evidence": [
+    "assembly/gerber_view_top.png",
+    "assembly/gerber_view_bottom.png"
+  ],
+  "open_cart_gates": [
+    "Confirm JLCPCB four-layer 1.0 mm Standard PCBA availability in the live cart.",
+    "Select Panel by JLCPCB with 5 mm process rails and confirm factory fiducials/tooling holes for both assembly sides in DFM.",
+    "Confirm current stock, lifecycle, assembly class and price for every exact LCSC order code; permit no similar substitutions."
+  ],
+  "open_release_gates": [
+    "Manufacturer evidence that EEMB LP502030-PCM permits 100 mA charging.",
+    "Independent power/thermal margin validation, including ME6211 dropout and TPS61099 4V7 ripple under PPG pulses.",
+    "Physical enclosure print/PCB/battery fit and selected optical/thermal interface materials.",
+    "Explicit user authorization to order."
+  ]
+}

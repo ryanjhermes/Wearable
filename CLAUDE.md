@@ -13,7 +13,13 @@ An experimental wearable moving from an archived Seeed XIAO ESP32S3 breakout pro
 blood-alcohol concentration from HR/HRV + skin temp + accelerometry (Kaczor et al., HICSS 2026),
 labeled with an external fuel-cell breathalyzer. **Not a medical device.**
 
-Current work is **PCB layout**. Firmware is treated as done; v1 is frozen in `archive/v1/`.
+**Layout is complete and verified as of 2026-09-18.** Current work is the three pre-order gates — the
+JLCPCB cart pass, the enclosure print/fit test, and bench validation of the rails on a built board.
+None can be closed from the keyboard. Firmware is treated as done; v1 is frozen in `archive/v1/`.
+
+**Before doing anything, read `## SETTLED — do not re-verify, do not re-open` at the top of
+`pcb/README.md`.** It lists the checks, decisions and JLCPCB settings that are closed. Re-running them
+wastes the usage window and has repeatedly been this project's failure mode.
 
 ## Authority map — read only what the task needs
 
@@ -57,8 +63,9 @@ Rationale for each is in `docs/DESIGN_HISTORY.md`.
 - **Board is 24 x 46 mm, 1.0 mm thick, 4 layers.** Battery sits *on top of* the board.
 - **No status LEDs, no screen, no buttons.** BOOT (GPIO9) + RESET are exposed as test pads — that
   is the only recovery path into a sealed board.
-- **The 402030 cell (30 x 20 mm, 250 mAh) dominates the footprint and that is accepted.** The
-  Whoop-class ~32 x 24 mm target is no longer a hard goal.
+- **The cell is final: EEMB `LP502030-PCM`, 250 mAh, 32 x 20.5 x 5.3 mm, already owned.** It
+  dominates the footprint and that is accepted; the Whoop-class ~32 x 24 mm target is no longer a
+  hard goal. Battery selection is closed and is not to be reopened or re-sourced.
 - **A LiPo pouch must never sit over the ESP32-C3-MINI-1 trace antenna.** Enforced by a Rule Area.
 - **Sensor scope is final for v2:** MAX30101 (PPG), LSM6DS3TR-C (6-axis), TMP117 (skin temp),
   SHT40 (ambient). **No EDA/GSR, no microphone, no ECG** — EDA is deferred to v3.
@@ -100,10 +107,17 @@ readable (`poppler` installed).
 
 These are unresolved and must not be silently decided:
 
-- Exact protected-battery identity: polarity, dimensions, and >=100 mA charge rating.
-- Independent electrical review, power-budget and thermal margin (ME6211 dropout, TPS61099 4V7
-  ripple under 200 mA green-LED pulses).
+- **Bench validation of the rails.** Every power number in this repo is a desk calculation or a
+  behavioral simulation. ME6211 dropout/thermal and TPS61099 4V7 ripple and transient response were
+  analysed on desk and in ngspice on 2026-09-17/18 and pass, but nothing has been measured.
+- **Peer electrical review by a second person.** The topology review was one author's pass.
+- **Physical enclosure fit.** CAD passes; nothing has been printed.
+- **1.0 mm 4-layer availability, DFM and current sourcing** must be confirmed in the JLCPCB cart
+  before ordering. This is a one-time cart pass, not a recurring check.
 - Wrist-PPG wavelength has **never been measured**. The diagnostic exists
-  (`archive/v1/src/max30102_raw_ir/`) and has never been run. It is now a post-arrival firmware
+  (`archive/v1/src/max30102_raw_ir/`) and has never been run. It is a post-arrival firmware
   experiment, not an ordering gate.
-- 1.0 mm 4-layer availability must be confirmed in the JLCPCB cart before ordering.
+
+**Closed 2026-09-18 — do not re-open:** the battery (EEMB LP502030-PCM already in hand, 250 mA max
+charge rating covers the planned 100 mA; **do not source a substitute**) and the 4V7 green-rail
+margin (R10 changed 270k -> 249k with user approval, implemented and re-verified).

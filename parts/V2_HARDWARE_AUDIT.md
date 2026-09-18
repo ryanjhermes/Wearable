@@ -82,6 +82,11 @@ The original always-on boost connection also violated the MAX30101's recommended
 This keeps VLED disconnected during reset and lets firmware enable it only after 1V8 is established.
 Verify that sequence and the VLED rise waveform during bring-up.
 
+**RESOLVED 2026-09-18:** R10 changed 270 kOhm -> 249 kOhm (user-approved), moving the nominal rail to
+5.016 V and the worst-case low corner from 4.470 V to 4.770 V. Dynamic behaviour was simulated in
+ngspice and is not a risk: a 51 mA green pulse moves the rail 4 mV. See `V2_BOM.md` and the verified
+log in `../pcb/README.md`. Bench validation of ripple, start-up and temperature is still required.
+
 Source: [TI TPS61099 datasheet](https://www.ti.com/lit/ds/symlink/tps61099.pdf), §§6.5, 7.3, 8.2.
 
 ### 4. TMP117 assembly treatment must be a deliberate design choice

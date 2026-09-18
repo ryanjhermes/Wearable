@@ -6397,7 +6397,7 @@
 		)
 		(uuid "a2444bba-cce3-4a14-9514-17f446bd67a1")
 	)
-	(text "VOUT = 1.0 V x (1M + 270k) / 270k = 4.704 V nominal."
+	(text "VOUT = 1.0 V x (1M + 249k) / 249k = 5.016 V nominal."
 		(exclude_from_sim no)
 		(at 457 116 0)
 		(effects
@@ -17477,7 +17477,7 @@
 				)
 			)
 		)
-		(property "Value" "270k"
+		(property "Value" "249k"
 			(at 480.06 102.87 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17520,7 +17520,7 @@
 				)
 			)
 		)
-		(property "MPN" "0402WGF2703TCE"
+		(property "MPN" "0402WGF2493TCE"
 			(at 480.06 101.6 0)
 			(hide yes)
 			(show_name no)
@@ -17531,7 +17531,7 @@
 				)
 			)
 		)
-		(property "LCSC" "C25770"
+		(property "LCSC" "C11425"
 			(at 480.06 101.6 0)
 			(hide yes)
 			(show_name no)

@@ -33,16 +33,34 @@ savings.
 
 ## Remaining user inputs before schematic freeze
 
-Only the battery evidence below is still open. Retention, the module order code, and the
-debug-LED question were all closed on 2026-09-16 (see the JLCPCB verification section).
+**Nothing in this section is open.** The battery was closed on 2026-09-18; retention, the module
+order code and the debug-LED question were closed on 2026-09-16 (see the JLCPCB verification
+section). The section is kept for the evidence trail.
 
 ### Battery evidence
 
-The user owns several 250 mAh cells with pigtails. Before schematic freeze, obtain a purchase link
-or clear photos of both faces, label, wire colors, connector, and any small protection PCB under the
-wrapper. Confirm polarity, dimensions including the protection-board bulge, built-in protection, and
-that the cell permits at least 100 mA charging (0.4 C). Do not assume connector polarity from wire
-color alone; small LiPo pigtails are not universally wired the same way.
+**Selected physical cell (user-confirmed 2026-09-17):** EEMB `LP502030-PCM`, a protected 3.7 V,
+250 mAh pouch cell already in the user's possession (Amazon ASIN `B08VRZTHDL`). Do not source a
+substitute or redesign the circuit around another cell. The supplied listing gives the protected
+maximum envelope as **32 x 20.5 x 5.3 mm** and mass as 5 g; these dimensions supersede the earlier
+30 x 20 x 4 mm report for mechanical work.
+
+The supplied product photo shows **two conductors, not three**, exiting together beside the PCM:
+red and black. The cell label explicitly identifies `Red (+)` and `Black (-)`, matching the PCB's
+two solder pads. There is therefore no third temperature/sense conductor to integrate for this
+selected pack. Preserve the connector until final wire-length/strain-relief placement is decided;
+do not infer polarity from color on a substitute pack. Built-in PCM protection
+against overcharge, over-discharge, over-current and short circuit is stated in the supplied listing.
+
+**CLOSED — 2026-09-18 (user decision, final). This cell is the battery for v2. Battery selection is
+not to be reopened.** Charge-current permission is satisfied by EEMB's own LP502030 cell
+specification (ZJQM-RD-SPC-H2305, 2022-10-25, linked from eemb.com/product-130, accessed
+2026-09-18), which states **maximum charge current 250 mA, 1.0C5A (CC&CV)**. The TP4054's 100 mA is
+0.4 C and sits inside that rating. Note for the record, not as a reopening: that document is the
+bare-cell revision, so it does not itself specify the -PCM pack's protection-circuit trip current or
+finished pack length. PCM over-current trips sit far above 100 mA, so this is a documentation gap
+rather than an electrical risk. Alternative cells were investigated on 2026-09-17/18 and are
+recorded in `../pcb/README.md` for history only; **do not source a substitute.**
 
 ### Offline data-retention requirement — RESOLVED 2026-09-16
 
@@ -153,18 +171,25 @@ Approved 4.7 V boost:
 | 1 | adjustable boost converter | TPS61099DRVR | C2842395 | WSON-6, 2 x 2 mm |
 | 1 | 2.2 uH inductor, 1.5 A saturation | Taiyo Yuden MAKK2016T2R2M | C92923 | 2.0 x 1.6 mm |
 | 1 | 1 MOhm, 1%, 0402, VOUT-to-FB | UNI-ROYAL 0402WGF1004TCE | C26083 | 0402 |
-| 1 | 270 kOhm, 1%, 0402, FB-to-GND | UNI-ROYAL 0402WGF2703TCE | C25770 | 0402 |
+| 1 | 249 kOhm, 1%, 0402, FB-to-GND | UNI-ROYAL 0402WGF2493TCE | C11425 | 0402 |
 | 1 | 100 kOhm, 1%, 0402, EN-to-GND | UNI-ROYAL 0402WGF1003TCE | C25741 | 0402 |
 | 3 | 10 uF, 10 V, X5R, 0603 | Samsung CL10A106KP8NNNC | C19702 | one input, two output |
 
-The divider gives approximately 4.704 V: `VOUT = 1 V x (1 MOhm + 270 kOhm) / 270 kOhm`. This sits
-inside the red/IR and green VLED ranges under the published PWM feedback-reference limits, but rail
+The divider gives approximately 5.016 V: `VOUT = 1 V x (1 MOhm + 249 kOhm) / 249 kOhm`.
+
+**R10 changed from 270 kOhm to 249 kOhm on 2026-09-18 (user-approved).** The original 270 kOhm gave a
+4.704 V nominal rail whose worst-case low corner — feedback reference at its 0.98 V minimum, 1%
+resistor endpoints and 50 nA of FB leakage across the 1 MOhm R9 — computed to 4.488 V by hand and
+4.470 V in ngspice, i.e. **below the MAX30101's 4.5 V green VLED+ minimum**. With 249 kOhm that
+corner moves to 4.770 V / 4.788 V, and the worst-case high corner stays under both the 5.5 V green
+maximum and the TPS61099's 5.6 V minimum OVP threshold. Same 0402 footprint, same UNI-ROYAL series,
+same net; no layout change. Simulation evidence: `../pcb/analysis/tps61099_4v7_boost.cir`. Rail
 margin still requires bench validation. Connect EN to GPIO10 (`PPG_PWR_EN`) and fit the listed
 100 kOhm pulldown. Pinout is 1 GND, 2 VOUT, 3 FB, 4 EN, 5 SW, 6 VIN, exposed pad GND. Keep the VIN
 capacitor/inductor/SW loop and VOUT capacitors extremely short.
 The MAX30101 still needs its local 4.7 uF + 100 nF VLED capacitors.
 
-The MAX30101 datasheet guarantees its 4.5-5.5 V green-LED supply range only at 25 C. The 4.704 V rail
+The MAX30101 datasheet guarantees its 4.5-5.5 V green-LED supply range only at 25 C. The 5.016 V rail
 meets that published condition, but green performance over actual skin/ambient temperature must be
 validated on hardware; it is not a datasheet guarantee across the sensor's full temperature range.
 
@@ -204,14 +229,22 @@ DNP or optional in v2. Removing it would be a later red/IR-only design change.
 | 3.3 V buck-boost | Avoids several parts; accepted tradeoff is reduced usable battery capacity |
 | Battery connector | Omitted; the protected cell wires are permanently soldered to marked pads with strain relief |
 
-## Schematic and layout status — 2026-09-16
+## Schematic and layout status — updated 2026-09-18
 
 The schematic at [`../pcb/`](../pcb/) (KiCad 10.0.5) is frozen for layout purposes. It is ERC-clean
 with 0 errors and 2 understood warnings, and its generated BOM reconciles exactly to the 51
-populated components planned here, per-value quantities included. KiCad schematic-parity DRC reports
-0 parity issues and 0 footprint errors. Layout has started with 64 footprints loaded, but nothing is
-intentionally positioned or routed and no board outline exists. Independent electrical review and
-power-budget/thermal review remain open; the design is not ready to order.
+populated components planned here, per-value quantities included. Layout, routing and zones are
+complete and accepted for the first prototype; KiCad schematic-parity DRC reports 0 issues and the
+final project-aware DRC has only the five documented accepted warnings. An independent electrical
+topology review found no new defect. The CAD enclosure/mechanical review passes for fabrication-file
+preparation and locally validated fabrication outputs now exist.
+
+**Updated 2026-09-18.** One user-approved schematic change has been made since the 2026-09-16 freeze:
+R10 270 kOhm -> 249 kOhm. It changed a value, MPN and LCSC code only, not the netlist, and ERC, DRC,
+schematic parity and `analyze_pcb.py` all returned results identical to the accepted 2026-09-17 run.
+Desk power/thermal analysis and an ngspice simulation of the 4V7 boost are complete, and the battery
+question is closed. **Still open: physical enclosure fit, bench validation of the rails, and the live
+JLCPCB cart. The design is not ready to order and no order is authorized.**
 
 Two real defects were caught during capture and are worth recording because both would have killed
 a first spin silently: the IMU ground ties shorted the I2C bus to ground, and `BAT+` existed as two
@@ -248,8 +281,11 @@ may continue, but independent electrical review is still required before fabrica
 
 ## Before ordering or release
 
-1. Verify the exact battery evidence listed above; green, permanent attachment, and supervised
-   charging are already locked.
+1. Complete the selected physical battery evidence listed above: obtain manufacturer charge-current
+   permission for 100 mA. Identity, protected 32 x 20.5 x 5.3 mm envelope, PCM-side wire exit,
+   two-conductor count and label-marked red-positive/black-negative polarity are documented from the
+   supplied listing and product photo. Green, permanent attachment, supervised charging, and use of
+   the already-owned EEMB `LP502030-PCM` are locked.
 2. ~~Lock the offline data-retention requirement.~~ **CLOSED 2026-09-16: per-second summaries use
    internal flash; full raw sessions require a connected phone.**
 3. ~~Lock the exact module order code.~~ **CLOSED 2026-09-16: ESP32-C3-MINI-1-N4 (C2838502).**
@@ -257,15 +293,21 @@ may continue, but independent electrical review is still required before fabrica
    in stock. N4 is therefore the only machine-placeable option at this assembler. It is NRND, not
    discontinued, and remains valid for a prototype spin. If a future spin needs N4X, the land pattern
    is identical but assembly sourcing must be rechecked and chip revision v1.1 SDK support confirmed.
-4. **Pinout/datasheet audit complete; independent electrical peer review remains open.** Recheck the
-   load-share topology and power-budget assumptions before fabrication.
+4. **Pinout/datasheet audit and independent electrical topology review complete.** The peer review
+   found no new topology defect in the load-share, USB-C, CC, ESD, straps or NC handling.
+   **Power-budget and thermal margin were analysed on desk 2026-09-17/18** — ME6211 dropout and
+   thermal, and TPS61099 4V7 ripple and transient response under PPG LED pulses, the latter simulated
+   in ngspice (`../pcb/analysis/tps61099_4v7_boost.cir`). Both pass with the R10 249k change and the
+   0 dBm BLE TX cap. **Bench measurement on a built board is still required and is the open item;
+   the desk analysis is not a substitute.** A peer review by a second person also remains open.
 5. **Footprint pin-map audit complete.** MAX30101 and MAKK2016 vendor land-pattern evidence remains
    unavailable; treat those footprints as documented residual risks.
 6. **ERC and BOM reconciliation complete:** 0 errors, 2 understood warnings, 51 populated parts.
 7. Confirm current stock, assembly class, lifecycle, and price in the JLCPCB cart. Use exact order
    codes; do not allow “similar” substitutions for regulators, MOSFETs, or connectors.
-8. Have another electrical review and review antenna, optical, thermal, USB, and switching-regulator
-   placement before fabrication.
+8. **Electrical topology, routed-board visual review and CAD antenna/optical/thermal/USB placement
+   review complete for fabrication-file preparation.** Physical enclosure fit, optical/thermal
+   interface material validation and power/thermal bench margin remain open before release.
 
 ## Primary design references
 
@@ -298,7 +340,7 @@ JLCPCB fab + assembly order.**
 | C165948 | TYPE-C-31-M-12 | Extended | 222,702 | 0.19 |
 | C2842395 | TPS61099DRVR | Extended | 3,984 | 1.27 |
 | C92923 | MAKK2016T2R2M 2.2 uH | Extended | 2,712 | 0.08 |
-| C25770 | 270 kOhm 0402 1% | Extended | 139,988 | 0.004 |
+| C11425 | 249 kOhm 0402 1% | Extended | 44,965 | 0.0005 |
 | C15127 | AO3401A | Basic | 469,801 | 0.09 |
 | C2480 | SS14 | Basic | 1,096,775 | 0.02 |
 | C1525 / C52923 / C19666 / C19702 | 100 nF / 1 uF / 4.7 uF / 10 uF | Basic | 3.3M-30.7M | <=0.03 |
@@ -312,7 +354,7 @@ Risks this surfaces, none of them blocking:
 - **13 Extended part types.** JLCPCB bills a per-unique-Extended-type loading fee, historically
   about $3 each with some waived. That is roughly $39 and is the dominant non-recurring cost on a
   small prototype run. Confirm the actual figure in the cart.
-- **C25770 is the only Extended passive.** No Basic 0402 1% 270 kOhm exists in the JLCPCB library, so
+- **C11425 is the only Extended passive.** No Basic 0402 1% 249 kOhm exists in the JLCPCB library either, so the 2026-09-18 R10 change does not alter the assembly-class burden: the outgoing C25770 was Extended too. As before,
   restructuring the TPS61099 feedback divider to Basic-only values is not available without changing
   the target voltage. Keep it.
 - **Two-sided SMT assembly is required** by the form factor (optical skin-side, MCU top-side). JLCPCB

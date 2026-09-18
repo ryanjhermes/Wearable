@@ -1,0 +1,121 @@
+{
+  "source_pcb_step": "enclosure/generated/mechanical_review/wearable_v2_pcb.step",
+  "surrogate_models": {
+    "J1": "8.94 x 7.30 x 3.20 mm conservative body from footprint/local part record",
+    "U7": "3.30 x 5.60 x 1.55 mm body from parts/max30101/README.md",
+    "U10": "1.50 x 1.50 x 0.50 mm body from parts/sht40/README.md"
+  },
+  "measurements": {
+    "board_nominal_mm": [
+      24.0,
+      46.0,
+      1.0
+    ],
+    "case_outer_mm": [
+      28.0,
+      50.0,
+      12.4
+    ],
+    "battery_envelope_mm": [
+      20.5,
+      32.0,
+      5.3
+    ],
+    "battery_xy_bounds_mm": [
+      61.75,
+      82.25,
+      -140.0,
+      -108.0
+    ],
+    "battery_to_antenna_keepout_mm": 2.1,
+    "battery_to_roof_mm": 0.35,
+    "battery_to_tallest_exported_pcb_mm": 0.955,
+    "battery_to_J1_vertical_mm": 0.25,
+    "battery_side_clearance_each_mm": 2.25,
+    "usb_opening_mm": [
+      10.0,
+      4.6
+    ],
+    "usb_body_mm": [
+      8.94,
+      3.2
+    ],
+    "usb_opening_side_clearance_each_mm": 0.53,
+    "usb_opening_vertical_clearance_each_mm": 0.7,
+    "max30101_hard_opening_mm": [
+      5.4,
+      7.7
+    ],
+    "max30101_body_mm": [
+      3.3,
+      5.6,
+      1.55
+    ],
+    "max30101_gasket_inner_clearance_each_mm": [
+      0.25,
+      0.25
+    ],
+    "tmp117_thermal_pad_mm": [
+      3.0,
+      3.0,
+      1.0
+    ],
+    "tmp117_nominal_interference_mm": 0.0,
+    "sht40_vent_mm": [
+      3.0,
+      2.0
+    ],
+    "sht40_vent_center_offset_mm": 1.4,
+    "sht40_to_battery_end_mm": 1.2,
+    "wire_keepout_to_antenna_keepout_mm": 33.6,
+    "snap_latch_count": 4,
+    "snap_tab_mm": [
+      4.0,
+      0.45,
+      2.3
+    ],
+    "snap_hook_projection_mm": 0.2,
+    "snap_slot_clearance_each_side_mm": 0.125,
+    "top_print_body_count": 1,
+    "bottom_print_body_count": 1
+  },
+  "collision_volumes": {
+    "hard_shell_vs_populated_pcb_mm3": 0.0,
+    "top_vs_native_pcb_mm3": 0.0,
+    "bottom_vs_native_pcb_mm3": 0.0,
+    "top_vs_J1_surrogate_mm3": 0.0,
+    "bottom_vs_U7_surrogate_mm3": 0.0,
+    "top_vs_U10_surrogate_mm3": 0.0,
+    "hard_shell_vs_battery_mm3": 0.0,
+    "cradle_vs_populated_pcb_mm3": 0.0,
+    "battery_vs_populated_pcb_mm3": 0.0,
+    "wire_keepout_vs_populated_pcb_mm3": 0.0,
+    "assembled_top_vs_bottom_mm3": 0.0,
+    "snap_tabs_vs_populated_pcb_mm3": 0.0
+  },
+  "checks": {
+    "no_hard_shell_to_pcb_collision": true,
+    "no_hard_shell_to_battery_collision": true,
+    "no_cradle_to_pcb_collision": true,
+    "no_battery_to_pcb_collision": true,
+    "wire_path_clear_of_populated_pcb": true,
+    "battery_clear_of_antenna_keepout": true,
+    "battery_has_roof_clearance": true,
+    "usb_opening_clears_body": true,
+    "sht40_vent_not_covered_by_battery": true,
+    "tmp117_pad_has_zero_nominal_interference": true,
+    "separate_shells_assemble_without_hard_overlap": true,
+    "snap_tabs_clear_populated_pcb": true,
+    "four_snap_latches_present": true,
+    "top_is_one_printable_solid": true,
+    "bottom_is_one_printable_solid": true
+  },
+  "all_checks_pass": true,
+  "limitations": [
+    "CAD review only; print and physical fit test have not been performed.",
+    "Snap dimensions target a first PETG/nylon FDM trial; printer/material shrinkage may require tuning the 0.125 mm-per-side slot clearance or 0.20 mm hook projection.",
+    "J1, U7 and U10 use conservative surrogate solids because their KiCad STEP models were unavailable locally.",
+    "The 1.0 mm TMP117 pad is a nominal zero-interference volume; final soft-pad material/compression requires physical validation.",
+    "The supplied battery listing does not establish permission to charge at 100 mA."
+  ]
+}

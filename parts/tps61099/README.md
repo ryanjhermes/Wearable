@@ -32,7 +32,7 @@ for green, above a one-cell LiPo over its entire charge range.
 | 1 | 10 uF, 10 V X5R | CL10A106KP8NNNC / C19702 | VIN to GND |
 | 2 | 10 uF, 10 V X5R | CL10A106KP8NNNC / C19702 | VOUT to GND |
 | 1 | 1 MOhm, 1% | 0402WGF1004TCE / C26083 | VOUT to FB |
-| 1 | 270 kOhm, 1% | 0402WGF2703TCE / C25770 | FB to GND |
+| 1 | 249 kOhm, 1% | 0402WGF2493TCE / C11425 | FB to GND (was 270k/C25770 until 2026-09-18; see `../V2_BOM.md`) |
 | 1 | 100 kOhm, 1% | 0402WGF1003TCE / C25741 | EN to GND; off during reset |
 
 The output is about 4.704 V. This target stays inside both MAX30101 VLED ranges: 3.1-5.0 V for
